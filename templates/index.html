@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FuelScope — Cheapest Fuel Near You</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Core palette - deep charcoal with warm amber/gold accent */
+            --ink: #0a0d0f;
+            --ink-elevated: #12171c;
+            --ink-surface: #1a2028;
+            --border: #2a323c;
+            --border-bright: #3a4450;
+            --text: #e8eef5;
+            --text-dim: #7a8a9a;
+            --text-faint: #4a5a6a;
+            --amber: #d4a843;
+            --amber-dim: #a8842e;
+            --amber-glow: #f0c85a;
+            --emerald: #2ec47a;
+            --emerald-dim: #1a8a52;
+            --crimson: #e84d4d;
+            --crimson-dim: #9e2e2e;
+            --azure: #3b8eff;
+            --azure-dim: #245fc4;
+            --violet: #a855f7;
+
+            /* Semantic fuel colors - calibrated for the dark palette */
+            --fuel-regular: #2ec47a;
+            --fuel-midgrade: #a855f7;
+            --fuel-premium: #d4a843;
+            --fuel-diesel: #e84d4d;
+            --fuel-e85: #3b8eff;
+            --fuel-e10: #3b8eff;
+            --fuel-e5: #3b8eff;
+            --fuel-lpg: #a855f7;
+
+            /* Typography */
+            --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+            /* Scale */
+            --step--2: clamp(0.69rem, 0.65rem + 0.2vw, 0.75rem);
+            --step--1: clamp(0.83rem, 0.78rem + 0.25vw, 0.94rem);
+            --step-0: clamp(1rem, 0.94rem + 0.3vw, 1.125rem);
+            --step-1: clamp(1.2rem, 1.125rem + 0.375vw, 1.375rem);
+            --step-2: clamp(1.44rem, 1.31rem + 0.65vw, 1.75rem);
+            --step-3: clamp(1.73rem, 1.56rem + 0.85vw, 2.25rem);
+            --step-4: clamp(2.07rem, 1.81rem + 1.3vw, 2.875rem);
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --ink: #f8fafc;
+                --ink-elevated: #ffffff;
+                --ink-surface: #f1f5f9;
+                --border: #dfe4ea;
+                --border-bright: #cbd5e1;
+                --text: #0f172a;
+                --text-dim: #5c6b7a;
+                --text-faint: #94a3b8;
+                --amber: #b8860b;
+                --amber-dim: #8a6d0a;
+                --amber-glow: #ca961a;
+                --emerald: #059669;
+                --emerald-dim: #047857;
+                --crimson: #dc2626;
+                --crimson-dim: #991b1b;
+                --azure: #2563eb;
+                --azure-dim: #1d4ed8;
+                --violet: #7c3aed;
+
+                --fuel-regular: #059669;
+                --fuel-midgrade: #7c3aed;
+                --fuel-premium: #b8860b;
+                --fuel-diesel: #dc2626;
+                --fuel-e85: #2563eb;
+                --fuel-e10: #2563eb;
+                --fuel-e5: #2563eb;
+                --fuel-lpg: #7c3aed;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { font-size: 100%; }
+
+        body {
+            font-family: var(--font-ui);
+            background: var(--ink);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-size: var(--step-0);
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Focus visible for keyboard nav */
+        :focus-visible {
+            outline: 2px solid var(--amber);
+            outline-offset: 2px;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--ink); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+        /* ===== HEADER / INSTRUMENT BAR ===== */
+        .instrument-bar {
+            background: linear-gradient(180deg, var(--ink-elevated) 0%, var(--ink-surface) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: clamp(0.75rem, 1vw, 1rem) clamp(1rem, 2vw, 2rem);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 1px 0 var(--border), 0 4px 24px -8px rgba(0,0,0,0.4);
+        }
+
+        .instrument-bar__inner {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: clamp(1rem, 2vw, 1.5rem);
+            flex-wrap: wrap;
+        }
+
+        .instrument-bar__brand {
+            display: flex;
+            align-items: baseline;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .instrument-bar__logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--amber) 0%, var(--amber-glow) 100%);
+            border-radius: 10px;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.2),
+                inset 0 -1px 0 rgba(0,0,0,0.2),
+                0 2px 8px rgba(212, 168, 67, 0.25);
+        }
+
+        .instrument-bar__logo svg { width: 24px; height: 24px; }
+
+        .instrument-bar__title {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: var(--step-1);
+            letter-spacing: -0.02em;
+            color: var(--text);
+        }
+
+        .instrument-bar__title span { color: var(--amber); }
+
+        .instrument-bar__controls {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            flex: 1;
+            justify-content: flex-end;
+        }
+
+        .input-field {
+            font-family: var(--font-ui);
+            font-size: var(--step-0);
+            background: var(--ink);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.625rem 0.875rem;
+            border-radius: 8px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+
+        .input-field::placeholder { color: var(--text-faint); }
+
+        .input-field:hover { border-color: var(--border-bright); }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--amber);
+            box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.15);
+            background: var(--ink-elevated);
+        }
+
+        .input-field--location { width: clamp(180px, 25vw, 280px); }
+        .input-field--radius { width: clamp(70px, 8vw, 90px); text-align: center; }
+
+        .select-field {
+            font-family: var(--font-ui);
+            font-size: var(--step-0);
+            background: var(--ink);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.625rem 2.25rem 0.625rem 0.875rem;
+            border-radius: 8px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237a8a9a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            min-width: clamp(130px, 15vw, 160px);
+        }
+
+        .select-field:hover { border-color: var(--border-bright); }
+        .select-field:focus {
+            outline: none;
+            border-color: var(--amber);
+            box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.15);
+            background: var(--ink-elevated);
+        }
+
+        .btn {
+            font-family: var(--font-ui);
+            font-weight: 600;
+            font-size: var(--step-0);
+            border: none;
+            border-radius: 8px;
+            padding: 0.625rem 1.125rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: transform 0.08s ease, box-shadow 0.15s ease, background 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+        .btn--primary {
+            background: linear-gradient(180deg, var(--amber) 0%, var(--amber-dim) 100%);
+            color: var(--ink);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.15),
+                0 2px 8px rgba(212, 168, 67, 0.25);
+        }
+
+        .btn--primary:hover:not(:disabled) {
+            background: linear-gradient(180deg, var(--amber-glow) 0%, var(--amber) 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.2),
+                0 4px 16px rgba(212, 168, 67, 0.35);
+        }
+
+        .btn--secondary {
+            background: var(--ink);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn--secondary:hover:not(:disabled) {
+            background: var(--ink-elevated);
+            border-color: var(--border-bright);
+        }
+
+        .btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+        .unit-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: var(--step--1);
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 0.375rem 0.5rem;
+            border-radius: 6px;
+            transition: color 0.15s ease, background 0.15s ease;
+            user-select: none;
+        }
+
+        .unit-toggle:hover { color: var(--text); background: var(--ink); }
+        .unit-toggle input { width: 16px; height: 16px; accent-color: var(--amber); cursor: pointer; }
+
+        /* ===== MAIN LAYOUT ===== */
+        .app-shell {
+            flex: 1;
+            display: grid;
+            grid-template-columns: clamp(340px, 32vw, 420px) 1fr;
+            min-height: 0;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 1024px) {
+            .app-shell { grid-template-columns: 1fr; }
+        }
+
+        /* ===== SIDEBAR / PANEL STACK ===== */
+        .panel-stack {
+            background: var(--ink-elevated);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: clamp(1rem, 1.5vw, 1.5rem);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(1rem, 1.25vw, 1.25rem);
+        }
+
+        @media (max-width: 1024px) {
+            .panel-stack {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                max-height: 40vh;
+                padding: clamp(0.75rem, 1.5vw, 1rem);
+            }
+        }
+
+        .panel {
+            background: var(--ink-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .panel__header {
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, var(--ink-surface) 0%, var(--ink) 100%);
+        }
+
+        .panel__title {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-dim);
+        }
+
+        .panel__body { padding: 1rem; }
+
+        /* Location Panel */
+        .location-display {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .location-display__label {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-faint);
+        }
+
+        .location-display__value {
+            font-family: var(--font-ui);
+            font-size: var(--step-0);
+            font-weight: 500;
+            color: var(--text);
+            line-height: 1.4;
+        }
+
+        /* Stats Panel */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .stat {
+            background: var(--ink);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem 0.875rem;
+            text-align: center;
+            transition: border-color 0.15s ease, transform 0.15s ease;
+        }
+
+        .stat:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+
+        .stat__value {
+            font-family: var(--font-mono);
+            font-size: var(--step-2);
+            font-weight: 700;
+            line-height: 1.1;
+            color: var(--text);
+        }
+
+        .stat__label {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-faint);
+            margin-top: 0.25rem;
+        }
+
+        /* Sources Panel */
+        .sources-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+        .source-card {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--ink);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .source-card:hover { border-color: var(--border-bright); background: var(--ink-elevated); }
+
+        .source-card__icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .source-card__icon--afdc { background: linear-gradient(135deg, var(--emerald-dim) 0%, var(--emerald) 100%); }
+        .source-card__icon--gasbuddy { background: linear-gradient(135deg, var(--azure-dim) 0%, var(--azure) 100%); }
+        .source-card__icon--fuelwide { background: linear-gradient(135deg, var(--violet) 0%, #c084fc 100%); }
+
+        .source-card__icon svg { width: 18px; height: 18px; color: white; }
+
+        .source-card__info { flex: 1; min-width: 0; }
+
+        .source-card__name {
+            font-family: var(--font-mono);
+            font-size: var(--step--1);
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .source-card__desc {
+            font-size: var(--step--2);
+            color: var(--text-dim);
+            margin-top: 0.125rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .source-card__link {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            color: var(--amber);
+            text-decoration: none;
+            font-weight: 700;
+            transition: color 0.15s ease;
+        }
+
+        .source-card__link:hover { color: var(--amber-glow); text-decoration: underline; }
+
+        /* Results Panel */
+        .results-panel { flex: 1; min-height: 280px; display: flex; flex-direction: column; }
+
+        .results-list { flex: 1; overflow-y: auto; }
+
+        .result-card {
+            background: var(--ink);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.625rem;
+            cursor: pointer;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+            position: relative;
+        }
+
+        .result-card:hover {
+            border-color: var(--amber);
+            box-shadow: 0 4px 20px -4px rgba(212, 168, 67, 0.15);
+            transform: translateX(2px);
+        }
+
+        .result-card--selected {
+            border-color: var(--amber);
+            box-shadow:
+                0 0 0 2px var(--ink-surface),
+                0 0 0 4px var(--amber),
+                0 4px 20px -4px rgba(212, 168, 67, 0.2);
+        }
+
+        .result-card__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-card__name {
+            font-family: var(--font-ui);
+            font-size: var(--step-0);
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .result-card__distance {
+            font-family: var(--font-mono);
+            font-size: var(--step--1);
+            color: var(--text-dim);
+            white-space: nowrap;
+            background: var(--ink-surface);
+            padding: 0.125rem 0.5rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .result-card__address {
+            font-size: var(--step--1);
+            color: var(--text-dim);
+            margin-bottom: 0.75rem;
+            line-height: 1.4;
+        }
+
+        .result-card__fuels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .fuel-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.625rem;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            background: var(--ink-surface);
+            transition: border-color 0.15s ease, transform 0.1s ease;
+        }
+
+        .fuel-pill:hover { transform: scale(1.02); }
+
+        .fuel-pill__type {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            color: var(--ink);
+        }
+
+        .fuel-pill__price {
+            font-family: var(--font-mono);
+            font-size: var(--step-0);
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--ink);
+        }
+
+        .fuel-pill__currency {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            font-weight: 700;
+            color: var(--ink);
+            opacity: 0.8;
+        }
+
+        .fuel-pill--no-price {
+            background: transparent;
+            border-color: var(--crimson);
+        }
+
+        .fuel-pill--no-price .fuel-pill__type,
+        .fuel-pill--no-price .fuel-pill__price { color: var(--crimson); }
+
+        /* Fuel color variants */
+        .fuel-pill--regular { background: linear-gradient(135deg, var(--emerald-dim) 0%, var(--emerald) 100%); }
+        .fuel-pill--midgrade { background: linear-gradient(135deg, var(--violet) 0%, #c084fc 100%); }
+        .fuel-pill--premium { background: linear-gradient(135deg, var(--amber-dim) 0%, var(--amber) 100%); }
+        .fuel-pill--diesel { background: linear-gradient(135deg, var(--crimson-dim) 0%, var(--crimson) 100%); }
+        .fuel-pill--e85 { background: linear-gradient(135deg, var(--azure-dim) 0%, var(--azure) 100%); }
+        .fuel-pill--e10 { background: linear-gradient(135deg, var(--azure-dim) 0%, var(--azure) 100%); }
+        .fuel-pill--e5 { background: linear-gradient(135deg, var(--azure-dim) 0%, var(--azure) 100%); }
+        .fuel-pill--lpg { background: linear-gradient(135deg, var(--violet) 0%, #c084fc 100%); }
+
+        .result-card__meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .source-badge {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            font-weight: 700;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: var(--ink-surface);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+        }
+
+        .result-card__updated {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            color: var(--text-faint);
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: clamp(2rem, 4vw, 3rem) 1.5rem;
+            text-align: center;
+            color: var(--text-dim);
+        }
+
+        .empty-state__icon {
+            width: 56px;
+            height: 56px;
+            opacity: 0.35;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state__text {
+            font-size: var(--step-0);
+            line-height: 1.5;
+        }
+
+        .empty-state__hint {
+            font-family: var(--font-mono);
+            font-size: var(--step--2);
+            color: var(--text-faint);
+            margin-top: 0.75rem;
+        }
+
+        /* ===== MAP CONTAINER ===== */
+        .map-viewport {
+            height: 100%;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        #map { height: 100%; width: 100%; }
+
+        /* Leaflet overrides */
+        .leaflet-container {
+            background: var(--ink);
+            font-family: var(--font-ui);
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: var(--ink-surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-shadow: 0 8px 32px -8px rgba(0,0,0,0.5);
+        }
+
+        .leaflet-popup-content { color: var(--text); margin: 0.5rem 0.875rem; }
+
+        .leaflet-popup-tip { background: var(--ink-surface); border: 1px solid var(--border); }
+
+        .leaflet-control-zoom {
+            border: 1px solid var(--border) !important;
+            border-radius: 8px !important;
+            overflow: hidden;
+        }
+
+        .leaflet-control-zoom a {
+            background: var(--ink-elevated) !important;
+            color: var(--text) !important;
+            border: none !important;
+            width: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            font-size: 1.25rem !important;
+        }
+
+        .leaflet-control-zoom a:hover { background: var(--ink-surface) !important; }
+
+        .leaflet-control-attribution {
+            background: rgba(10, 13, 15, 0.8) !important;
+            color: var(--text-faint) !important;
+            border-radius: 6px 0 0 0 !important;
+            backdrop-filter: blur(8px);
+        }
+
+        /* ===== LOADING OVERLAY ===== */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 13, 15, 0.92);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .loading-overlay--visible { display: flex; }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--amber);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-overlay__text {
+            font-family: var(--font-mono);
+            font-size: var(--step--1);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-dim);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 640px) {
+            .instrument-bar__controls { width: 100%; justify-content: stretch; }
+            .input-field--location { flex: 1; min-width: 0; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .result-card__header { flex-direction: column; align-items: flex-start; }
+            .result-card__distance { align-self: flex-start; }
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(212, 168, 67, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(212, 168, 67, 0); }
+        }
+
+        .animate-in { animation: fadeInUp 0.4s ease-out forwards; }
+
+        .result-card { animation: fadeInUp 0.3s ease-out backwards; }
+        .result-card:nth-child(1) { animation-delay: 0.05s; }
+        .result-card:nth-child(2) { animation-delay: 0.1s; }
+        .result-card:nth-child(3) { animation-delay: 0.15s; }
+        .result-card:nth-child(4) { animation-delay: 0.2s; }
+        .result-card:nth-child(5) { animation-delay: 0.25s; }
+        .result-card:nth-child(6) { animation-delay: 0.3s; }
+    </style>
+</head>
+<body>
+    <header class="instrument-bar">
+        <div class="instrument-bar__inner">
+            <div class="instrument-bar__brand">
+                <div class="instrument-bar__logo" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </div>
+                <h1 class="instrument-bar__title">Fuel<span>Scope</span></h1>
+            </div>
+
+            <div class="instrument-bar__controls">
+                <input type="text" id="locationInput" class="input-field input-field--location" placeholder="ZIP, city, or address" aria-label="Search location">
+                <button id="searchBtn" class="btn btn--primary" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="M21 21l-4.35-4.35"></path>
+                    </svg>
+                    Search
+                </button>
+                <button id="useLocationBtn" class="btn btn--secondary" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+                    </svg>
+                    My Location
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="app-shell">
+        <aside class="panel-stack" aria-label="Search panels">
+            <!-- Search Settings Panel -->
+            <section class="panel">
+                <header class="panel__header">
+                    <h2 class="panel__title">Search Settings</h2>
+                </header>
+                <div class="panel__body">
+                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                        <label for="radiusInput" style="font-family:var(--font-mono);font-size:var(--step--2);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);white-space:nowrap;">Radius</label>
+                        <input type="number" id="radiusInput" class="input-field input-field--radius" value="10" min="1" max="100" step="1" aria-label="Search radius">
+                        <span id="radiusUnit" style="font-family:var(--font-mono);font-size:var(--step-0);color:var(--text-dim);">km</span>
+                        <label class="unit-toggle">
+                            <input type="checkbox" id="milesToggle" aria-label="Use miles instead of kilometers">
+                            <span>Miles</span>
+                        </label>
+                    </div>
+                    <div style="margin-top:0.875rem;">
+                        <label for="fuelSelect" style="font-family:var(--font-mono);font-size:var(--step--2);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);display:block;margin-bottom:0.5rem;">Fuel Types</label>
+                        <select id="fuelSelect" class="select-field" multiple aria-label="Select fuel types">
+                            <option value="regular">Regular</option>
+                            <option value="midgrade">Midgrade</option>
+                            <option value="premium">Premium</option>
+                            <option value="diesel">Diesel</option>
+                            <option value="e85">E85</option>
+                            <option value="e10">E10</option>
+                            <option value="e5">E5</option>
+                            <option value="lpg">LPG</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Location Panel -->
+            <section class="panel">
+                <header class="panel__header">
+                    <h2 class="panel__title">Location</h2>
+                </header>
+                <div class="panel__body">
+                    <div class="location-display">
+                        <span class="location-display__label">Searching near</span>
+                        <span class="location-display__value" id="locationValue">Detecting…</span>
+                    </div>
+                    <div class="stats-grid" style="margin-top:1rem;">
+                        <div class="stat">
+                            <div class="stat__value" id="statCount">—</div>
+                            <div class="stat__label">Stations</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat__value" id="statBest">—</div>
+                            <div class="stat__label">Best Price</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Sources Panel -->
+            <section class="panel">
+                <header class="panel__header">
+                    <h2 class="panel__title">Data Sources</h2>
+                </header>
+                <div class="panel__body">
+                    <div class="sources-list" id="sourcesList">
+                        <div class="empty-state" style="padding:1.5rem;">
+                            <p style="font-size:var(--step--1);">Search to see active sources</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Panel -->
+            <section class="panel results-panel">
+                <header class="panel__header">
+                    <h2 class="panel__title">Results</h2>
+                </header>
+                <div class="panel__body" style="padding:0;flex:1;overflow:hidden;display:flex;flex-direction:column;">
+                    <div class="results-list" id="resultsList">
+                        <div class="empty-state" id="emptyState">
+                            <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="M21 21l-4.35-4.35"></path>
+                            </svg>
+                            <p class="empty-state__text">Search for fuel prices to see results</p>
+                            <p class="empty-state__hint">Enter a location or use "My Location"</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </aside>
+
+        <main class="map-viewport" id="map" aria-label="Fuel price map"></main>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite" aria-hidden="true">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <p class="loading-overlay__text">Searching prices</p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // ===== CONFIGURATION =====
+        const FUEL_COLORS = {
+            'REGULAR': 'var(--fuel-regular)',
+            'MIDGRADE': 'var(--fuel-midgrade)',
+            'PREMIUM': 'var(--fuel-premium)',
+            'DIESEL': 'var(--fuel-diesel)',
+            'E85': 'var(--fuel-e85)',
+            'E10': 'var(--fuel-e10)',
+            'E5': 'var(--fuel-e5)',
+            'LPG': 'var(--fuel-lpg)'
+        };
+
+        const FUEL_PILL_CLASS = {
+            'REGULAR': 'fuel-pill--regular',
+            'MIDGRADE': 'fuel-pill--midgrade',
+            'PREMIUM': 'fuel-pill--premium',
+            'DIESEL': 'fuel-pill--diesel',
+            'E85': 'fuel-pill--e85',
+            'E10': 'fuel-pill--e10',
+            'E5': 'fuel-pill--e5',
+            'LPG': 'fuel-pill--lpg'
+        };
+
+        // ===== STATE =====
+        let map = null;
+        let markers = [];
+        let selectedStation = null;
+        let userMarker = null;
+        let useMiles = false;
+        let lastLat = null;
+        let lastLon = null;
+
+        // ===== MAP INITIALIZATION =====
+        function initMap(lat, lon) {
+            if (map) {
+                map.setView([lat, lon], 12);
+                return;
+            }
+
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([lat, lon], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Add zoom control in bottom-right
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // Add attribution in bottom-left
+            L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
+        }
+
+        // ===== MARKER CREATION =====
+        function createMarkerIcon(color, isSelected = false, label = null) {
+            const borderWidth = isSelected ? 3 : 2;
+            const size = isSelected ? 34 : 28;
+            const fontSize = isSelected ? 13 : 11;
+
+            return L.divIcon({
+                className: 'custom-marker',
+                html: `
+                    <div style="
+                        width: ${size}px;
+                        height: ${size}px;
+                        border-radius: 50%;
+                        background: ${color};
+                        border: ${borderWidth}px solid #fff;
+                        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        font-size: ${fontSize}px;
+                        font-weight: 700;
+                        font-family: 'Space Mono', monospace;
+                    ">${label || '⛽'}</div>
+                `,
+                iconSize: [size, size],
+                iconAnchor: [size / 2, size / 2]
+            });
+        }
+
+        function createUserMarker(lat, lon) {
+            if (userMarker) {
+                userMarker.setLatLng([lat, lon]);
+                return;
+            }
+
+            userMarker = L.marker([lat, lon], {
+                icon: L.divIcon({
+                    className: 'user-marker',
+                    html: `
+                        <div style="
+                            width: 22px;
+                            height: 22px;
+                            border-radius: 50%;
+                            background: var(--amber);
+                            border: 3px solid #fff;
+                            box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+                            animation: pulseGlow 2s ease-in-out infinite;
+                        "></div>
+                        <style>
+                            @keyframes pulseGlow {
+                                0%, 100% { box-shadow: 0 0 0 0 rgba(212, 168, 67, 0.6); }
+                                50% { box-shadow: 0 0 0 10px rgba(212, 168, 67, 0); }
+                            }
+                        </style>
+                    `,
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11]
+                })
+            }).addTo(map);
+
+            userMarker.bindPopup('<strong>Your location</strong>').openPopup();
+        }
+
+        // ===== STATION MARKERS =====
+        function addStationMarkers(stations) {
+            // Clear existing
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+
+            const bounds = L.latLngBounds();
+            let hasValidCoords = false;
+
+            stations.forEach((station, index) => {
+                if (!station.lat || !station.lon) return;
+
+                hasValidCoords = true;
+                const color = FUEL_COLORS[station.fuel_type] || 'var(--amber)';
+                const pillClass = FUEL_PILL_CLASS[station.fuel_type] || '';
+                const isSelected = selectedStation &&
+                    selectedStation.station === station.station &&
+                    selectedStation.address === station.address &&
+                    selectedStation.fuel_type === station.fuel_type;
+
+                // Use first letter of fuel type as marker label
+                const label = station.fuel_type.charAt(0);
+
+                const marker = L.marker([station.lat, station.lon], {
+                    icon: createMarkerIcon(color, isSelected, label)
+                }).addTo(map);
+
+                // Build popup content
+                const fuelsHtml = stations
+                    .filter(s => s.station === station.station && s.address === station.address)
+                    .map(s => {
+                        const pill = FUEL_PILL_CLASS[s.fuel_type] || '';
+                        const priceHtml = s.price && s.price > 0
+                            ? `<span style="font-family:'Space Mono',monospace;font-weight:700;">${s.price.toFixed(3)}</span> <span style="opacity:0.8;font-size:0.7rem;">${s.currency}</span>`
+                            : '<span style="color:var(--crimson);font-weight:600;font-size:0.7rem;">HAS PUMP</span>';
+                        return `<span class="fuel-pill ${pill}" style="font-size:0.65rem;padding:0.2rem 0.5rem;">${s.fuel_type}: ${priceHtml}</span>`;
+                    })
+                    .join(' ');
+
+                const dist = station.distance_km || 0;
+                const distStr = useMiles ? `${(dist * 0.621371).toFixed(1)} mi` : `${dist.toFixed(1)} km`;
+
+                marker.bindPopup(`
+                    <div style="min-width:220px;font-family:'DM Sans',sans-serif;">
+                        <h4 style="margin:0 0 0.5rem 0;font-size:0.95rem;">${station.station}</h4>
+                        <p style="margin:0 0 0.5rem 0;color:var(--text-dim);font-size:0.8rem;">${station.address}</p>
+                        <div style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.5rem;">${fuelsHtml}</div>
+                        <small style="color:var(--text-faint);">${distStr} away • ${station.source}</small>
+                    </div>
+                `);
+
+                marker.on('click', () => selectStation(station, marker));
+                markers.push(marker);
+                bounds.extend([station.lat, station.lon]);
+            });
+
+            if (hasValidCoords && markers.length > 0) {
+                bounds.extend(map.getCenter());
+                map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+            }
+        }
+
+        // ===== SELECTION SYNC =====
+        function selectStation(station, marker) {
+            selectedStation = station;
+
+            // Update marker icons
+            markers.forEach(m => {
+                const popupContent = m._popup ? m._popup.getContent() : '';
+                const isSel = popupContent.includes(station.station) && popupContent.includes(station.fuel_type);
+                const color = FUEL_COLORS[station.fuel_type] || 'var(--amber)';
+                const label = station.fuel_type.charAt(0);
+                m.setIcon(createMarkerIcon(color, isSel, label));
+            });
+
+            // Update list selection
+            document.querySelectorAll('.result-card').forEach(el => {
+                const match = el.dataset.station === station.station &&
+                             el.dataset.address === station.address &&
+                             el.dataset.fuel === station.fuel_type;
+                el.classList.toggle('result-card--selected', match);
+            });
+
+            // Scroll to result
+            const selectedEl = document.querySelector('.result-card--selected');
+            if (selectedEl) selectedEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // ===== RESULTS RENDERING =====
+        function renderResults(stations) {
+            const container = document.getElementById('resultsList');
+            const emptyState = document.getElementById('emptyState');
+
+            if (!stations || stations.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="padding:clamp(2rem,4vw,3rem) 1.5rem;">
+                        <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                        <p class="empty-state__text">No prices found</p>
+                        <p class="empty-state__hint">Try increasing radius or different location</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Group by station
+            const stationGroups = {};
+            stations.forEach(s => {
+                const key = `${s.station}|${s.address}`;
+                if (!stationGroups[key]) stationGroups[key] = [];
+                stationGroups[key].push(s);
+            });
+
+            let html = '';
+            Object.entries(stationGroups).forEach(([key, fuels]) => {
+                const first = fuels[0];
+                const dist = first.distance_km || 0;
+                const distance = useMiles ? `${(dist * 0.621371).toFixed(1)} mi` : `${dist.toFixed(1)} km`;
+
+                html += `
+                    <div class="result-card"
+                         data-station="${first.station}"
+                         data-address="${first.address}"
+                         data-fuel="${fuels[0].fuel_type}">
+                        <div class="result-card__header">
+                            <span class="result-card__name">${first.station}</span>
+                            <span class="result-card__distance">${distance}</span>
+                        </div>
+                        <div class="result-card__address">${first.address}</div>
+                        <div class="result-card__fuels">
+                            ${fuels.map(f => {
+                                const hasPrice = f.price && f.price > 0;
+                                const isE85NoPrice = f.fuel_type === 'E85' && (!f.price || f.price === 0);
+                                const pillClass = FUEL_PILL_CLASS[f.fuel_type] || '';
+                                const noPriceClass = isE85NoPrice ? 'fuel-pill--no-price' : '';
+                                return `
+                                <span class="fuel-pill ${pillClass} ${noPriceClass}">
+                                    <span class="fuel-pill__type">${f.fuel_type}</span>
+                                    ${hasPrice
+                                        ? `<span class="fuel-pill__price">${f.price.toFixed(3)}</span><span class="fuel-pill__currency">${f.currency}</span>`
+                                        : '<span class="fuel-pill__price" style="font-size:0.65rem;font-weight:600;">HAS PUMP</span>'}
+                                </span>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div class="result-card__meta">
+                            <span class="source-badge">${first.source}</span>
+                            <span class="result-card__updated">Updated: ${first.updated?.split('T')[0] || '—'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // Click handlers
+            container.querySelectorAll('.result-card').forEach(el => {
+                el.addEventListener('click', () => {
+                    const stationName = el.dataset.station;
+                    const stationAddress = el.dataset.address;
+                    const stationFuel = el.dataset.fuel;
+
+                    const station = stations.find(s =>
+                        s.station === stationName &&
+                        s.address === stationAddress &&
+                        s.fuel_type === stationFuel
+                    );
+
+                    if (station) {
+                        const marker = markers.find(m => {
+                            const content = m._popup ? m._popup.getContent() : '';
+                            return content.includes(stationName) && content.includes(stationFuel);
+                        });
+                        if (marker) selectStation(station, marker);
+                    }
+                });
+            });
+        }
+
+        // ===== STATS & SOURCES =====
+        function updateStats(stations) {
+            document.getElementById('statCount').textContent = stations.length;
+
+            if (stations.length > 0) {
+                const best = stations[0];
+                document.getElementById('statBest').textContent = `${best.price.toFixed(3)} ${best.currency}`;
+            } else {
+                document.getElementById('statBest').textContent = '—';
+            }
+        }
+
+        function updateSources(sources) {
+            const container = document.getElementById('sourcesList');
+            if (!sources || sources.length === 0) {
+                container.innerHTML = '<div class="empty-state" style="padding:1rem;"><p style="font-size:var(--step--1);">No data sources</p></div>';
+                return;
+            }
+
+            const sourceInfo = {
+                'AFDC': { id: 'afdc', name: 'NREL AFDC', desc: 'Official DOE Alternative Fuels Data Center', url: 'https://afdc.energy.gov' },
+                'GasBuddy': { id: 'gasbuddy', name: 'GasBuddy', desc: 'Community-reported prices for US/Canada', url: 'https://www.gasbuddy.com' },
+                'FuelWide': { id: 'fuelwide', name: 'FuelWide', desc: 'Official government open data (FR/IT/ES/AU)', url: 'https://fuelwide.com' }
+            };
+
+            let html = '';
+            sources.forEach(src => {
+                const info = sourceInfo[src] || { id: 'gasbuddy', name: src, desc: 'Fuel price data', url: '#' };
+                html += `
+                    <div class="source-card">
+                        <div class="source-card__icon source-card__icon--${info.id}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                ${info.id === 'afdc' ? '<path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path>' : ''}
+                                ${info.id === 'gasbuddy' ? '<path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path><circle cx="12" cy="12" r="3"></circle>' : ''}
+                                ${info.id === 'fuelwide' ? '<path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path><circle cx="12" cy="12" r="2"></circle>' : ''}
+                            </svg>
+                        </div>
+                        <div class="source-card__info">
+                            <div class="source-card__name">${info.name}</div>
+                            <div class="source-card__desc">${info.desc}</div>
+                        </div>
+                        <a href="${info.url}" target="_blank" rel="noopener" class="source-card__link">More</a>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // ===== SEARCH LOGIC =====
+        async function search() {
+            const location = document.getElementById('locationInput').value.trim();
+            let radius = parseInt(document.getElementById('radiusInput').value) || 10;
+            if (useMiles) radius = Math.round(radius * 1.609);
+
+            const fuelSelect = document.getElementById('fuelSelect');
+            const fuelTypes = Array.from(fuelSelect.selectedOptions).map(o => o.value);
+
+            showLoading(true);
+
+            try {
+                const payload = { radius, fuel_types: fuelTypes, limit: 50 };
+
+                if (location) {
+                    payload.location = location;
+                } else if (lastLat && lastLon) {
+                    payload.lat = lastLat;
+                    payload.lon = lastLon;
+                }
+
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                lastLat = data.lat;
+                lastLon = data.lon;
+
+                document.getElementById('locationValue').textContent = data.location;
+
+                initMap(data.lat, data.lon);
+                createUserMarker(data.lat, data.lon);
+                addStationMarkers(data.prices);
+                renderResults(data.prices);
+                updateStats(data.prices);
+                updateSources(data.sources);
+
+            } catch (error) {
+                console.error('Search error:', error);
+                alert('Search failed. Please try again.');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function useMyLocation() {
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser');
+                return;
+            }
+
+            showLoading(true);
+            document.getElementById('useLocationBtn').disabled = true;
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    lastLat = position.coords.latitude;
+                    lastLon = position.coords.longitude;
+                    document.getElementById('locationInput').value = '';
+                    await search();
+                    showLoading(false);
+                    document.getElementById('useLocationBtn').disabled = false;
+                },
+                (error) => {
+                    showLoading(false);
+                    document.getElementById('useLocationBtn').disabled = false;
+                    alert('Unable to get your location: ' + error.message);
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').classList.toggle('loading-overlay--visible', show);
+            document.getElementById('loadingOverlay').setAttribute('aria-hidden', !show);
+        }
+
+        // ===== EVENT LISTENERS =====
+        document.getElementById('searchBtn').addEventListener('click', search);
+        document.getElementById('useLocationBtn').addEventListener('click', useMyLocation);
+        document.getElementById('locationInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') search(); });
+        document.getElementById('radiusInput').addEventListener('change', search);
+        document.getElementById('fuelSelect').addEventListener('change', search);
+
+        document.getElementById('milesToggle').addEventListener('change', (e) => {
+            useMiles = e.target.checked;
+            const unitEl = document.getElementById('radiusUnit');
+            const radiusInput = document.getElementById('radiusInput');
+            const currentValue = parseInt(radiusInput.value) || 10;
+
+            if (useMiles) {
+                unitEl.textContent = 'mi';
+                radiusInput.value = Math.round(currentValue / 1.609);
+                radiusInput.max = 62;
+            } else {
+                unitEl.textContent = 'km';
+                radiusInput.value = Math.round(currentValue * 1.609);
+                radiusInput.max = 100;
+            }
+            search();
+        });
+
+        // Auto-search on input blur
+        document.getElementById('locationInput').addEventListener('blur', () => {
+            if (document.getElementById('locationInput').value.trim()) search();
+        });
+
+        // Initial load
+        search();
+    </script>
+</body>
+</html>
