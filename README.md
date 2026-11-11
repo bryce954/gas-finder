@@ -168,20 +168,21 @@ curl -X POST http://localhost:5002/api/search \
 - [ ] Favorites / price drop alerts for saved stations
 - [ ] Route planning: find cheapest fuel along a driving route
 
-### Future
-- [ ] Expand FuelWide coverage to more countries
-- [ ] Multi-point E85 search improvements
-- [ ] Docker Compose for easy deployment
-- [ ] Mobile app (React Native or Flutter)
-
 ### Done
 - [x] CLI tool with JSON/human-readable output
 - [x] Web app with Leaflet map + miles/km toggle
 - [x] Multi-source: GasBuddy, FuelWide, NREL AFDC
 - [x] E85 "Has Pump" badge for stations with pumps but no price
 - [x] Price history tracking with trend analysis
+- [x] Map directions to stations (Google Maps, Apple Maps, Waze)
 - [x] GitHub Actions CI (lint, type-check, tests, Docker build)
 - [x] Miles as default unit
+
+### Future
+- [ ] Expand FuelWide coverage to more countries
+- [ ] Multi-point E85 search improvements
+- [ ] Docker Compose for easy deployment
+- [ ] Mobile app (React Native or Flutter)
 
 ## License
 

@@ -611,6 +611,62 @@
             border-top: 1px solid var(--border);
         }
 
+        .directions-btn {
+            font-family: var(--font-ui);
+            font-weight: 600;
+            font-size: var(--step--2);
+            border: none;
+            border-radius: 6px;
+            padding: 0.5rem 0.875rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.15s ease, transform 0.08s ease;
+            white-space: nowrap;
+        }
+
+        .directions-btn--google {
+            background: linear-gradient(180deg, var(--amber) 0%, var(--amber-dim) 100%);
+            color: var(--ink);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 8px rgba(212, 168, 67, 0.25);
+        }
+
+        .directions-btn--google:hover { background: linear-gradient(180deg, var(--amber-glow) 0%, var(--amber) 100%); }
+
+        .directions-btn--apple {
+            background: linear-gradient(180deg, #007aff 0%, #005bb5 100%);
+            color: #ffffff;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 8px rgba(0, 122, 255, 0.3);
+        }
+
+        .directions-btn--apple:hover { background: linear-gradient(180deg, #0a84ff 0%, #007aff 100%); }
+
+        .directions-btn--waze {
+            background: linear-gradient(180deg, #34c759 0%, #2bb64a 100%);
+            color: #ffffff;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 8px rgba(52, 199, 89, 0.3);
+        }
+
+        .directions-btn--waze:hover { background: linear-gradient(180deg, #4cd96c 0%, #34c759 100%); }
+
+        .directions-btn:active { transform: scale(0.98); }
+
+        .map-provider-select {
+            font-family: var(--font-ui);
+            font-size: var(--step-0);
+            background: var(--ink);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.5rem 0.875rem;
+            border-radius: 8px;
+            cursor: pointer;
+            min-width: clamp(110px, 12vw, 130px);
+        }
+
+        .map-provider-select:hover { border-color: var(--border-bright); }
+        .map-provider-select:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px rgba(212, 168, 67, 0.15); background: var(--ink-elevated); }
+
         .source-badge {
             font-family: var(--font-mono);
             font-size: var(--step--2);
@@ -826,6 +882,12 @@
                             <input type="checkbox" id="milesToggle" aria-label="Use miles instead of kilometers" checked>
                             <span>Miles</span>
                         </label>
+                        <label for="mapProvider" style="font-family:var(--font-mono);font-size:var(--step--2);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);white-space:nowrap;margin-left:1rem;">Map for Directions</label>
+                        <select id="mapProvider" class="map-provider-select" aria-label="Choose map provider for directions">
+                            <option value="google">Google Maps</option>
+                            <option value="apple">Apple Maps</option>
+                            <option value="waze">Waze</option>
+                        </select>
                     </div>
                     <div style="margin-top:0.875rem;">
                         <label for="fuelSelect" style="font-family:var(--font-mono);font-size:var(--step--2);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);display:block;margin-bottom:0.5rem;">Fuel Types</label>
@@ -939,7 +1001,8 @@
         let selectedStation = null;
         let userMarker = null;
         let useMiles = true;
-        let lastLat = null;
+        let mapProvider = 'google';
+let lastLat = null;
         let lastLon = null;
 
         // ===== MAP INITIALIZATION =====
@@ -1078,6 +1141,13 @@
                         <p style="margin:0 0 0.5rem 0;color:var(--text-dim);font-size:0.8rem;">${station.address}</p>
                         <div style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.5rem;">${fuelsHtml}</div>
                         <small style="color:var(--text-faint);">${distStr} away • ${station.source}</small>
+                        <br>
+                        <a href="${getDirectionsUrl(station.lat, station.lon, station.station)}" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.375rem;margin-top:0.375rem;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:12px;height:12px;">
+                                <path d="M17 2l-1.5 17M17 2l3.35 14.111M5.719 16l1.758 2 4.333-2.653M7.5 21.5l-2.5-6.419M10.5 21.5l-2.5-6.419M17 2v18.285"></path>
+                            </svg>
+                            Directions
+                        </a>
                     </div>
                 `);
 
@@ -1180,6 +1250,12 @@
                         <div class="result-card__meta">
                             <span class="source-badge">${first.source}</span>
                             <span class="result-card__updated">Updated: ${first.updated ? (typeof first.updated === 'number' ? new Date(first.updated).toISOString().split('T')[0] : first.updated.split('T')[0]) : '—'}</span>
+                            <button class="directions-btn directions-btn--${mapProvider}" data-lat="${first.lat}" data-lon="${first.lon}" data-name="${first.station}" aria-label="Get directions to ${first.station}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;">
+                                    <path d="M17 2l-1.5 17M17 2l3.35 14.111M5.719 16l1.758 2 4.333-2.653M7.5 21.5l-2.5-6.419M10.5 21.5l-2.5-6.419M17 2v18.285"></path>
+                                </svg>
+                                Directions
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1209,6 +1285,11 @@
                     }
                 });
             });
+
+            // Directions button handlers
+            container.querySelectorAll('.directions-btn').forEach(btn => {
+                btn.addEventListener('click', handleDirectionsClick);
+            });
         }
 
         // ===== STATS & SOURCES =====
@@ -1223,7 +1304,33 @@
             }
         }
 
-        function updateSources(sources) {
+        // ===== DIRECTIONS =====
+
+function getDirectionsUrl(lat, lon, name) {
+    const dest = `${lat},${lon}`;
+    const label = encodeURIComponent(name || 'Fuel Station');
+
+    switch (mapProvider) {
+        case 'apple':
+            return `https://maps.apple.com/?daddr=${dest}&dirflg=d`;
+        case 'waze':
+            return `https://www.waze.com/ul?ll=${dest}&q=${label}&navigate=yes`;
+        case 'google':
+        default:
+            return `https://www.google.com/maps/dir/?api=1&destination=${dest}&destination_place_name=${label}`;
+    }
+}
+
+function handleDirectionsClick(event) {
+    const btn = event.currentTarget;
+    const lat = btn.getAttribute('data-lat');
+    const lon = btn.getAttribute('data-lon');
+    const name = btn.getAttribute('data-name');
+    const url = getDirectionsUrl(lat, lon, name);
+    window.open(url, '_blank');
+}
+
+function updateSources(sources) {
             const container = document.getElementById('sourcesList');
             if (!sources || sources.length === 0) {
                 container.innerHTML = '<div class="empty-state" style="padding:1rem;"><p style="font-size:var(--step--1);">No data sources</p></div>';
@@ -1368,6 +1475,14 @@
                 radiusInput.max = 100;
             }
             search();
+        });
+
+        document.getElementById('mapProvider').addEventListener('change', (e) => {
+            mapProvider = e.target.value;
+            // Re-render results to update directions button styling
+            if (document.getElementById('resultsList').querySelector('.result-card')) {
+                search();
+            }
         });
 
         // Auto-search on input blur
