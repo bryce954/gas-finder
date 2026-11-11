@@ -1179,7 +1179,7 @@
                         </div>
                         <div class="result-card__meta">
                             <span class="source-badge">${first.source}</span>
-                            <span class="result-card__updated">Updated: ${first.updated?.split('T')[0] || '—'}</span>
+                            <span class="result-card__updated">Updated: ${first.updated ? (typeof first.updated === 'number' ? new Date(first.updated).toISOString().split('T')[0] : first.updated.split('T')[0]) : '—'}</span>
                         </div>
                     </div>
                 `;
