@@ -120,7 +120,7 @@ templates/index.html   # FuelScope frontend (Leaflet + vanilla JS)
 |--------|----------|------------|-------|
 | **GasBuddy** | US, Canada | Regular, Midgrade, Premium, Diesel, E85 | Community-reported via `py-gasbuddy` |
 | **FuelWide** | FR, IT, ES, AU | Diesel, Petrol95, Petrol98, LPG, E5, E10 | Official gov open data |
-| **NREL AFDC** | US nationwide | E85, CNG, LNG, LPG, Electric, Hydrogen | Canonical station locations (DNS issues may apply) |
+| **NREL AFDC** | US nationwide | E85, CNG, LNG, LPG, Electric, Hydrogen | Canonical station locations via ArcGIS FeatureServer fallback |
 
 ### GasBuddy Rate Limiting
 
@@ -160,6 +160,28 @@ curl -X POST http://localhost:5002/api/search \
 - **Fuel Colors:** Semantic gradients per type (calibrated for dark/light)
 - **Motion:** Staggered entrance, pulse glow, respects `prefers-reduced-motion`
 - **Theming:** Full light mode via `prefers-color-scheme`
+
+## Roadmap
+
+### In Progress
+- [ ] Add price history charts (visualize 7/30-day trends per station)
+- [ ] Favorites / price drop alerts for saved stations
+- [ ] Route planning: find cheapest fuel along a driving route
+
+### Future
+- [ ] Expand FuelWide coverage to more countries
+- [ ] Multi-point E85 search improvements
+- [ ] Docker Compose for easy deployment
+- [ ] Mobile app (React Native or Flutter)
+
+### Done
+- [x] CLI tool with JSON/human-readable output
+- [x] Web app with Leaflet map + miles/km toggle
+- [x] Multi-source: GasBuddy, FuelWide, NREL AFDC
+- [x] E85 "Has Pump" badge for stations with pumps but no price
+- [x] Price history tracking with trend analysis
+- [x] GitHub Actions CI (lint, type-check, tests, Docker build)
+- [x] Miles as default unit
 
 ## License
 

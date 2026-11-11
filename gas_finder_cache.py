@@ -4,17 +4,15 @@ Local cache for GasBuddy results to handle rate limiting
 """
 
 import json
-import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-print(f"DEBUG: gas_finder_cache loaded from {__file__}", file=sys.stderr)
 
 CACHE_DIR = Path.home() / ".cache" / "gas_finder"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_FILE = CACHE_DIR / "gasbuddy_cache.json"
-CACHE_TTL = 86400  # 1 hour
+CACHE_TTL = 86400  # 24 hours
 
 
 @dataclass
@@ -46,15 +44,8 @@ class GasBuddyCache:
                     data = json.load(f)
                 for key, prices in data.items():
                     self._cache[key] = [CachedPrice(**p) for p in prices]
-                print(
-                    f"DEBUG: Loaded cache with {len(self._cache)} keys from {self.cache_file}",
-                    file=sys.stderr,
-                )
             except Exception as e:
-                print(f"DEBUG: Cache load failed: {e}", file=sys.stderr)
                 self._cache = {}
-        else:
-            print(f"DEBUG: Cache file not found: {self.cache_file}", file=sys.stderr)
 
     def _save(self):
         try:
@@ -62,7 +53,7 @@ class GasBuddyCache:
             with open(self.cache_file, "w") as f:
                 json.dump(data, f)
         except Exception as e:
-            print(f"DEBUG: Cache save failed: {e}", file=sys.stderr)
+            pass
 
     def _make_key(
         self, lat: float, lon: float, radius_km: float, fuel_types: list[str]
@@ -72,37 +63,21 @@ class GasBuddyCache:
         lon_key = round(lon * 100) / 100
         fuels = ",".join(sorted(f.lower() for f in fuel_types)) if fuel_types else "all"
         key = f"{lat_key},{lon_key},{int(radius_km)},{fuels}"
-        print(
-            f"DEBUG: Cache key: {key} (lat={lat}, lon={lon}, radius={radius_km}, fuels={fuel_types})",
-            file=sys.stderr,
-        )
         return key
 
     def get(
         self, lat: float, lon: float, radius_km: float, fuel_types: list[str]
     ) -> list[CachedPrice] | None:
         key = self._make_key(lat, lon, radius_km, fuel_types)
-        print(f"DEBUG: Cache lookup for key: {key}", file=sys.stderr)
-        print(f"DEBUG: Available keys: {list(self._cache.keys())}", file=sys.stderr)
         if key in self._cache:
             prices = self._cache[key]
             # Check if cache is still valid
             if prices and time.time() - prices[0].cached_at < self.cache_ttl:
-                print(
-                    f"DEBUG: Cache HIT for {key} ({len(prices)} prices, age={time.time() - prices[0].cached_at:.0f}s)",
-                    file=sys.stderr,
-                )
                 return prices
             else:
                 # Expired - remove
-                print(
-                    f"DEBUG: Cache EXPIRED for {key} (age={time.time() - prices[0].cached_at:.0f}s)",
-                    file=sys.stderr,
-                )
                 del self._cache[key]
                 self._save()
-        else:
-            print(f"DEBUG: Cache MISS for {key}", file=sys.stderr)
         return None
 
     def set(
@@ -136,10 +111,6 @@ class GasBuddyCache:
         if cached_prices:
             self._cache[key] = cached_prices
             self._save()
-            print(
-                f"DEBUG: Cached {len(cached_prices)} prices with key {key}",
-                file=sys.stderr,
-            )
 
     def clear_expired(self):
         now = time.time()
