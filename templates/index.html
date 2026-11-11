@@ -820,10 +820,10 @@
                 <div class="panel__body">
                     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                         <label for="radiusInput" style="font-family:var(--font-mono);font-size:var(--step--2);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);white-space:nowrap;">Radius</label>
-                        <input type="number" id="radiusInput" class="input-field input-field--radius" value="10" min="1" max="100" step="1" aria-label="Search radius">
-                        <span id="radiusUnit" style="font-family:var(--font-mono);font-size:var(--step-0);color:var(--text-dim);">km</span>
+                        <input type="number" id="radiusInput" class="input-field input-field--radius" value="10" min="1" max="62" step="1" aria-label="Search radius">
+                        <span id="radiusUnit" style="font-family:var(--font-mono);font-size:var(--step-0);color:var(--text-dim);">mi</span>
                         <label class="unit-toggle">
-                            <input type="checkbox" id="milesToggle" aria-label="Use miles instead of kilometers">
+                            <input type="checkbox" id="milesToggle" aria-label="Use miles instead of kilometers" checked>
                             <span>Miles</span>
                         </label>
                     </div>
@@ -938,7 +938,7 @@
         let markers = [];
         let selectedStation = null;
         let userMarker = null;
-        let useMiles = false;
+        let useMiles = true;
         let lastLat = null;
         let lastLon = null;
 
@@ -1179,7 +1179,7 @@
                         </div>
                         <div class="result-card__meta">
                             <span class="source-badge">${first.source}</span>
-                            <span class="result-card__updated">Updated: ${first.updated?.split('T')[0] || '—'}</span>
+                            <span class="result-card__updated">Updated: ${first.updated ? (typeof first.updated === 'number' ? new Date(first.updated).toISOString().split('T')[0] : first.updated.split('T')[0]) : '—'}</span>
                         </div>
                     </div>
                 `;
