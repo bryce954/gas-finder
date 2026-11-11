@@ -5,7 +5,7 @@ A CLI tool and web app to find the cheapest gas, diesel, E85, and alternative fu
 ## Screenshots
 
 ### Web App (http://localhost:5002)
-![FuelScope Web App](https://github.com/user-attachments/assets/fuelscope-web.png)
+![FuelScope Web App]([https://github.com/user-attachments/assets/fuelscope-web.png](https://raw.githubusercontent.com/bryce954/gas-finder/main/assets/fuelscope-web.png))
 
 *Dark mode default with warm amber accent • Light mode supported • Reduced motion respected*
 
