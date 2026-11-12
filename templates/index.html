@@ -1994,30 +1994,42 @@ async function handleRouteSearch() {
 
     try {
         // Geocode start
-        const startGeo = await new Promise((resolve, reject) => {
-            const finder = get_finder();
-            const geo = finder.geocode_address(start);
-            if (geo) resolve(geo);
-            else reject(new Error('Failed to geocode start location'));
+        const startResp = await fetch('/api/geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: start }),
         });
+        const startData = await startResp.json();
+        if (startResp.ok && startData.lat != null) {
+            var startLat = startData.lat;
+            var startLon = startData.lon;
+        } else {
+            throw new Error(startData.error || 'Failed to geocode start location');
+        }
 
         // Geocode end
-        const endGeo = await new Promise((resolve, reject) => {
-            const finder = get_finder();
-            const geo = finder.geocode_address(end);
-            if (geo) resolve(geo);
-            else reject(new Error('Failed to geocode end location'));
+        const endResp = await fetch('/api/geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address: end }),
         });
+        const endData = await endResp.json();
+        if (endResp.ok && endData.lat != null) {
+            var endLat = endData.lat;
+            var endLon = endData.lon;
+        } else {
+            throw new Error(endData.error || 'Failed to geocode end location');
+        }
 
         // Search route
         const response = await fetch('/api/route', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                start_lat: startGeo.lat,
-                start_lon: startGeo.lon,
-                end_lat: endGeo.lat,
-                end_lon: endGeo.lon,
+                start_lat: startLat,
+                start_lon: startLon,
+                end_lat: endLat,
+                end_lon: endLon,
                 fuel_types: fuelTypes,
                 sample_every_km: 5,
                 search_radius_km: 5,
@@ -2030,7 +2042,7 @@ async function handleRouteSearch() {
             return;
         }
 
-        renderRouteResults(data.prices, startGeo.lat, startGeo.lon, endGeo.lat, endGeo.lon);
+        renderRouteResults(data.prices, startLat, startLon, endLat, endLon);
 
         document.getElementById('locationValue').textContent = `Route: ${start} → ${end}`;
     } catch (e) {
