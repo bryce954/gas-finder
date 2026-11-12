@@ -652,6 +652,27 @@
 
         .directions-btn:active { transform: scale(0.98); }
 
+.chart-btn {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: var(--step--2);
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 0.875rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.15s ease, transform 0.08s ease;
+    white-space: nowrap;
+    background: linear-gradient(180deg, var(--violet) 0%, #7c3aed 100%);
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 8px rgba(168, 85, 247, 0.3);
+}
+
+.chart-btn:hover { background: linear-gradient(180deg, #a855f7 0%, var(--violet) 100%); }
+.chart-btn:active { transform: scale(0.98); }
+
         .map-provider-select {
             font-family: var(--font-ui);
             font-size: var(--step-0);
@@ -800,7 +821,136 @@
             color: var(--text-dim);
         }
 
-        /* ===== RESPONSIVE ===== */
+/* ===== CHART PANEL ===== */
+.chart-panel {
+    background: var(--ink-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 1rem;
+}
+
+.chart-panel__header {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--ink-surface) 0%, var(--ink) 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-panel__title {
+    font-family: var(--font-mono);
+    font-size: var(--step--2);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0;
+}
+
+.chart-panel__body {
+    padding: 1rem;
+}
+
+.chart-panel__chart {
+    position: relative;
+    height: 200px;
+}
+
+.chart-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+}
+
+.chart-close:hover { color: var(--text); background: var(--ink); }
+
+.chart-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 13, 15, 0.9);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.chart-modal--visible { display: flex; }
+
+.chart-modal__content {
+    background: var(--ink-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: min(700px, 90vw);
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-modal__header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--ink-surface) 0%, var(--ink) 100%);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-modal__title {
+    font-family: var(--font-mono);
+    font-size: var(--step-1);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0;
+}
+
+.chart-modal__body {
+    padding: 1.5rem;
+    flex: 1;
+    overflow: auto;
+}
+
+.chart-modal__canvas {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.chart-modal__close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 0.5rem;
+    font-size: var(--step-1);
+}
+
+.chart-modal__close:hover { color: var(--text); }
+
+.chart-no-data {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-dim);
+}
+
+.chart-no-data__icon {
+    width: 48px;
+    height: 48px;
+    opacity: 0.35;
+    margin-bottom: 1rem;
+}
+
+/* ===== RESPONSIVE ===== */
         @media (max-width: 640px) {
             .instrument-bar__controls { width: 100%; justify-content: stretch; }
             .input-field--location { flex: 1; min-width: 0; }
@@ -970,7 +1120,22 @@
         <p class="loading-overlay__text">Searching prices</p>
     </div>
 
+    <div class="chart-modal" id="chartModal" role="dialog" aria-modal="true" aria-label="Price History Chart">
+        <div class="chart-modal__content">
+            <header class="chart-modal__header">
+                <h2 class="chart-modal__title" id="chartTitle">Price History</h2>
+                <button class="chart-modal__close" id="chartClose" aria-label="Close chart">×</button>
+            </header>
+            <div class="chart-modal__body">
+                <div class="chart-modal__canvas">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // ===== CONFIGURATION =====
         const FUEL_COLORS = {
@@ -1256,6 +1421,14 @@ let lastLat = null;
                                 </svg>
                                 Directions
                             </button>
+                            <button class="chart-btn" data-station="${first.station}" data-address="${first.address}" data-fuel="${fuels[0].fuel_type}" aria-label="View price history for ${first.station}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v4"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.47M23 21v-2h1"></path>
+                                </svg>
+                                Chart
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1265,7 +1438,10 @@ let lastLat = null;
 
             // Click handlers
             container.querySelectorAll('.result-card').forEach(el => {
-                el.addEventListener('click', () => {
+                el.addEventListener('click', (e) => {
+                    // Don't trigger if clicking a button inside the card
+                    if (e.target.closest('button, a')) return;
+
                     const stationName = el.dataset.station;
                     const stationAddress = el.dataset.address;
                     const stationFuel = el.dataset.fuel;
@@ -1289,6 +1465,11 @@ let lastLat = null;
             // Directions button handlers
             container.querySelectorAll('.directions-btn').forEach(btn => {
                 btn.addEventListener('click', handleDirectionsClick);
+            });
+
+            // Chart button handlers
+            container.querySelectorAll('.chart-btn').forEach(btn => {
+                btn.addEventListener('click', handleChartClick);
             });
         }
 
@@ -1328,6 +1509,147 @@ function handleDirectionsClick(event) {
     const name = btn.getAttribute('data-name');
     const url = getDirectionsUrl(lat, lon, name);
     window.open(url, '_blank');
+}
+
+// ===== PRICE HISTORY CHART =====
+
+let chartInstance = null;
+
+function openChartModal() {
+    const modal = document.getElementById('chartModal');
+    modal.classList.add('chart-modal--visible');
+}
+
+function closeChartModal() {
+    const modal = document.getElementById('chartModal');
+    modal.classList.remove('chart-modal--visible');
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
+}
+
+async function renderChart(station, address, fuelType) {
+    const titleEl = document.getElementById('chartTitle');
+    titleEl.textContent = `Price History — ${station}`;
+
+    try {
+        const response = await fetch('/api/history/station', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ station, address, fuel_type: fuelType, days: 30 })
+        });
+        const data = await response.json();
+
+        const canvas = document.getElementById('priceChart');
+        canvas.parentNode.innerHTML = '<canvas id="priceChart"></canvas>';
+        const ctx = document.getElementById('priceChart').getContext('2d');
+
+        const history = data.history || [];
+        if (history.length === 0) {
+            canvas.parentNode.innerHTML = `
+                <div class="chart-no-data">
+                    <svg class="chart-no-data__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="M21 21l-4.35-4.35"></path>
+                    </svg>
+                    <p>No price history available for ${station}</p>
+                </div>
+            `;
+            return;
+        }
+
+        const labels = history.map(h => {
+            const d = new Date(h.timestamp);
+            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        });
+        const prices = history.map(h => h.price);
+
+        // Get fuel color
+        const fuelColorMap = {
+            'REGULAR': 'var(--fuel-regular)',
+            'MIDGRADE': 'var(--fuel-midgrade)',
+            'PREMIUM': 'var(--fuel-premium)',
+            'DIESEL': 'var(--fuel-diesel)',
+            'E85': 'var(--fuel-e85)',
+            'E10': 'var(--fuel-e10)',
+            'E5': 'var(--fuel-e5)',
+            'LPG': 'var(--fuel-lpg)'
+        };
+        const lineColor = fuelColorMap[fuelType] || 'var(--amber)';
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `${fuelType} Price (${data.current ? data.current : 'N/A'} ${history[0]?.currency || 'USD'})`,
+                    data: prices,
+                    borderColor: lineColor,
+                    backgroundColor: lineColor + '20',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    fill: false,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: { color: var(--text-dim), font: { family: 'DM Sans', size: 12 } }
+                    },
+                    title: {
+                        display: true,
+                        text: station,
+                        color: var(--text),
+                        font: { family: 'DM Sans', size: 16, weight: '600' }
+                    },
+                    tooltip: {
+                        backgroundColor: var(--ink-surface),
+                        titleColor: var(--text),
+                        bodyColor: var(--text-dim),
+                        borderColor: var(--border),
+                        borderWidth: 1,
+                        callbacks: {
+                            label: ctx => `${ctx.parsed.y.toFixed(3)} ${history[0]?.currency || 'USD'}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: var(--text-dim), font: { family: 'Space Mono', size: 11 } },
+                        grid: { color: var(--border) }
+                    },
+                    y: {
+                        ticks: { color: var(--text-dim), font: { family: 'Space Mono', size: 11 } },
+                        grid: { color: var(--border) },
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    } catch (e) {
+        console.error('Chart error:', e);
+        document.getElementById('priceChart').parentNode.innerHTML = `
+            <div class="chart-no-data">
+                <p>Failed to load price history for ${station}</p>
+            </div>
+        `;
+    }
+
+    openChartModal();
+}
+
+function handleChartClick(event) {
+    const btn = event.currentTarget;
+    const station = btn.getAttribute('data-station');
+    const address = btn.getAttribute('data-address');
+    const fuelType = btn.getAttribute('data-fuel');
+    renderChart(station, address, fuelType);
 }
 
 function updateSources(sources) {
@@ -1483,6 +1805,12 @@ function updateSources(sources) {
             if (document.getElementById('resultsList').querySelector('.result-card')) {
                 search();
             }
+        });
+
+        document.getElementById('chartClose').addEventListener('click', closeChartModal);
+
+        document.getElementById('chartModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeChartModal();
         });
 
         // Auto-search on input blur

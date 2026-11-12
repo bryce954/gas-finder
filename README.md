@@ -174,6 +174,7 @@ curl -X POST http://localhost:5002/api/search \
 - [x] Multi-source: GasBuddy, FuelWide, NREL AFDC
 - [x] E85 "Has Pump" badge for stations with pumps but no price
 - [x] Price history tracking with trend analysis
+- [x] Price history charts (Chart.js line charts)
 - [x] Map directions to stations (Google Maps, Apple Maps, Waze)
 - [x] GitHub Actions CI (lint, type-check, tests, Docker build)
 - [x] Miles as default unit
