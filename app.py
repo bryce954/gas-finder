@@ -109,8 +109,9 @@ def search():
     prices = prices[:limit]
 
     # Convert to dict for JSON
-    results = []
+    history = get_price_history()
     sources_seen = set()
+    results = []
     for p in prices:
         sources_seen.add(p.source)
         results.append(
@@ -125,6 +126,7 @@ def search():
                 "updated": p.updated,
                 "distance_km": p.distance_km,
                 "source": p.source,
+                "is_favorited": history.is_favorited(p.station, p.address, p.fuel_type),
             }
         )
 
@@ -245,6 +247,106 @@ def history_stats():
     try:
         history = get_price_history()
         return jsonify(history.get_stats())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/favorites", methods=["GET"])
+def favorites_list():
+    """List all favorited stations."""
+    try:
+        history = get_price_history()
+        favs = history.get_favorites()
+        return jsonify({
+            "favorites": [
+                {
+                    "id": f.id,
+                    "station": f.station,
+                    "address": f.address,
+                    "latitude": f.latitude,
+                    "longitude": f.longitude,
+                    "fuel_type": f.fuel_type,
+                    "alert_threshold": f.alert_threshold,
+                    "created_at": f.created_at,
+                }
+                for f in favs
+            ]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/favorites", methods=["POST"])
+def favorites_add():
+    """Add a station/fuel to favorites."""
+    data = request.get_json()
+    station = data.get("station", "")
+    address = data.get("address", "")
+    lat = data.get("latitude")
+    lon = data.get("longitude")
+    fuel_type = data.get("fuel_type", "")
+    alert_threshold = data.get("alert_threshold")
+
+    if not station or not address or lat is None or lon is None or not fuel_type:
+        return jsonify({"error": "station, address, latitude, longitude, and fuel_type required"}), 400
+
+    try:
+        history = get_price_history()
+        fav_id = history.add_favorite(station, address, float(lat), float(lon), fuel_type, alert_threshold)
+        if fav_id:
+            return jsonify({"id": fav_id, "message": "Added to favorites"}), 201
+        return jsonify({"message": "Already favorited"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/favorites", methods=["DELETE"])
+def favorites_remove():
+    """Remove a station/fuel from favorites."""
+    data = request.get_json()
+    station = data.get("station", "")
+    address = data.get("address", "")
+    fuel_type = data.get("fuel_type", "")
+
+    if not station or not address or not fuel_type:
+        return jsonify({"error": "station, address, and fuel_type required"}), 400
+
+    try:
+        history = get_price_history()
+        removed = history.remove_favorite(station, address, fuel_type)
+        if removed:
+            return jsonify({"message": "Removed from favorites"}), 200
+        return jsonify({"error": "Not favorited"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/favorites/check", methods=["GET"])
+def favorites_check_alerts():
+    """Check all favorites for price drop alerts."""
+    try:
+        history = get_price_history()
+        alerts = history.check_price_alerts()
+        return jsonify({"alerts": alerts, "count": len(alerts)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/favorites/is-favorited", methods=["POST"])
+def favorites_is_favorited():
+    """Check if a station/fuel is favorited."""
+    data = request.get_json()
+    station = data.get("station", "")
+    address = data.get("address", "")
+    fuel_type = data.get("fuel_type", "")
+
+    if not station or not address or not fuel_type:
+        return jsonify({"error": "station, address, and fuel_type required"}), 400
+
+    try:
+        history = get_price_history()
+        is_fav = history.is_favorited(station, address, fuel_type)
+        return jsonify({"is_favorited": is_fav})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

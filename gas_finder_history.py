@@ -28,6 +28,18 @@ class PriceSnapshot:
     timestamp: datetime
 
 
+@dataclass
+class Favorite:
+    station: str
+    address: str
+    latitude: float
+    longitude: float
+    fuel_type: str
+    alert_threshold: float | None = None
+    id: int | None = None
+    created_at: str | None = None
+
+
 class PriceHistory:
     def __init__(self, db_path: Path = DB_PATH):
         self.db_path = db_path
@@ -48,6 +60,19 @@ class PriceHistory:
                     source TEXT NOT NULL,
                     timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(station, address, fuel_type, timestamp)
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS favorites (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    station TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    latitude REAL NOT NULL,
+                    longitude REAL NOT NULL,
+                    fuel_type TEXT NOT NULL,
+                    alert_threshold REAL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(station, address, fuel_type)
                 )
             """)
             conn.execute("""
@@ -178,6 +203,104 @@ class PriceHistory:
                 results.append(trend)
 
         return sorted(results, key=lambda x: x["pct_change"])
+
+    def add_favorite(self, station: str, address: str, latitude: float, longitude: float,
+                     fuel_type: str, alert_threshold: float | None = None) -> int:
+        """Add a station/fuel to favorites. Returns the favorite ID."""
+        with sqlite3.connect(self.db_path) as conn:
+            try:
+                cur = conn.execute("""
+                    INSERT OR IGNORE INTO favorites
+                    (station, address, latitude, longitude, fuel_type, alert_threshold)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (station, address, latitude, longitude, fuel_type.upper(), alert_threshold))
+                if cur.lastrowid:
+                    return cur.lastrowid
+                # Already exists - return existing ID
+                row = conn.execute("""
+                    SELECT id FROM favorites
+                    WHERE station = ? AND address = ? AND fuel_type = ?
+                """, (station, address, fuel_type.upper())).fetchone()
+                return row[0] if row else None
+            except Exception as e:
+                print(f"History: Failed to add favorite {station}: {e}", file=sys.stderr)
+                return None
+
+    def remove_favorite(self, station: str, address: str, fuel_type: str) -> bool:
+        """Remove a station/fuel from favorites. Returns True if removed."""
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.execute("""
+                DELETE FROM favorites
+                WHERE station = ? AND address = ? AND fuel_type = ?
+            """, (station, address, fuel_type.upper()))
+            return cur.rowcount > 0
+
+    def get_favorites(self) -> list[Favorite]:
+        """Get all favorited stations."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT * FROM favorites ORDER BY created_at DESC
+            """).fetchall()
+
+        return [
+            Favorite(
+                id=r["id"],
+                station=r["station"],
+                address=r["address"],
+                latitude=r["latitude"],
+                longitude=r["longitude"],
+                fuel_type=r["fuel_type"],
+                alert_threshold=r["alert_threshold"],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    def is_favorited(self, station: str, address: str, fuel_type: str) -> bool:
+        """Check if a station/fuel is favorited."""
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute("""
+                SELECT 1 FROM favorites
+                WHERE station = ? AND address = ? AND fuel_type = ?
+                LIMIT 1
+            """, (station, address, fuel_type.upper())).fetchone()
+            return row is not None
+
+    def check_price_alerts(self) -> list[dict]:
+        """Check all favorites for price drops below alert threshold.
+        Returns list of alerts with station, fuel_type, current_price, threshold, change."""
+        alerts = []
+        favorites = self.get_favorites()
+
+        for fav in favorites:
+            if fav.alert_threshold is None:
+                continue
+
+            history = self.get_history(fav.station, fav.address, fav.fuel_type, days=7)
+            if len(history) < 2:
+                continue
+
+            current_price = history[-1].price
+            if current_price <= fav.alert_threshold:
+                prev_price = history[-2].price
+                change = current_price - prev_price
+                pct_change = (change / prev_price * 100) if prev_price > 0 else 0
+
+                alerts.append({
+                    "station": fav.station,
+                    "address": fav.address,
+                    "fuel_type": fav.fuel_type,
+                    "latitude": fav.latitude,
+                    "longitude": fav.longitude,
+                    "current_price": current_price,
+                    "threshold": fav.alert_threshold,
+                    "change": round(change, 3),
+                    "pct_change": round(pct_change, 1),
+                    "currency": history[-1].currency,
+                })
+
+        return alerts
 
     def cleanup_old(self, days: int = 90):
         """Remove snapshots older than N days."""

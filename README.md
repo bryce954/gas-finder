@@ -176,6 +176,7 @@ curl -X POST http://localhost:5002/api/search \
 - [x] Price history tracking with trend analysis
 - [x] Price history charts (Chart.js line charts)
 - [x] Map directions to stations (Google Maps, Apple Maps, Waze)
+- [x] Favorites with price drop alerts
 - [x] GitHub Actions CI (lint, type-check, tests, Docker build)
 - [x] Miles as default unit
 
@@ -184,6 +185,7 @@ curl -X POST http://localhost:5002/api/search \
 - [ ] Multi-point E85 search improvements
 - [ ] Docker Compose for easy deployment
 - [ ] Mobile app (React Native or Flutter)
+- [ ] Route planning: find cheapest fuel along a driving route
 
 ## License
 

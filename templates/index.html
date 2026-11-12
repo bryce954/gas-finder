@@ -673,6 +673,36 @@
 .chart-btn:hover { background: linear-gradient(180deg, #a855f7 0%, var(--violet) 100%); }
 .chart-btn:active { transform: scale(0.98); }
 
+.fav-btn {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: var(--step--2);
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 0.875rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.15s ease, transform 0.08s ease;
+    white-space: nowrap;
+    background: var(--ink);
+    color: var(--text-dim);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 2px 8px rgba(0,0,0,0.25);
+}
+
+.fav-btn:hover:not(.fav-btn--active) { color: var(--text); background: var(--ink-surface); }
+
+.fav-btn--active {
+    background: linear-gradient(180deg, var(--amber) 0%, var(--amber-dim) 100%);
+    color: var(--ink);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 2px 8px rgba(212, 168, 67, 0.25);
+}
+
+.fav-btn--active:hover { background: linear-gradient(180deg, var(--amber-glow) 0%, var(--amber) 100%); }
+
+.fav-btn:active { transform: scale(0.98); }
+
         .map-provider-select {
             font-family: var(--font-ui);
             font-size: var(--step-0);
@@ -1429,6 +1459,12 @@ let lastLat = null;
                                 </svg>
                                 Chart
                             </button>
+                            <button class="fav-btn ${first.is_favorited ? 'fav-btn--active' : ''}" data-station="${first.station}" data-address="${first.address}" data-lat="${first.lat}" data-lon="${first.lon}" data-fuel="${fuels[0].fuel_type}" aria-label="${first.is_favorited ? 'Remove from favorites' : 'Add to favorites'}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;">
+                                    <path d="M20.67 4.47a10 10 0 0 0-17.54 2.88c0 7.14 7.49 10.58 10.06 11.31a1 1 0 0 0 .92 0c2.57-.73 10.06-4.17 10.06-11.31a10 10 0 0 0-3.5-8.88"></path>
+                                </svg>
+                                ${first.is_favorited ? 'Favorited' : 'Favorite'}
+                            </button>
                         </div>
                     </div>
                 `;
@@ -1470,6 +1506,11 @@ let lastLat = null;
             // Chart button handlers
             container.querySelectorAll('.chart-btn').forEach(btn => {
                 btn.addEventListener('click', handleChartClick);
+            });
+
+            // Favorite button handlers
+            container.querySelectorAll('.fav-btn').forEach(btn => {
+                btn.addEventListener('click', handleFavoriteClick);
             });
         }
 
@@ -1667,6 +1708,48 @@ function handleChartClick(event) {
     const address = btn.getAttribute('data-address');
     const fuelType = btn.getAttribute('data-fuel');
     renderChart(station, address, fuelType);
+}
+
+async function handleFavoriteClick(event) {
+    const btn = event.currentTarget;
+    const station = btn.getAttribute('data-station');
+    const address = btn.getAttribute('data-address');
+    const lat = btn.getAttribute('data-lat');
+    const lon = btn.getAttribute('data-lon');
+    const fuelType = btn.getAttribute('data-fuel');
+    const isActive = btn.classList.contains('fav-btn--active');
+
+    try {
+        if (isActive) {
+            const response = await fetch('/api/favorites', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ station, address, fuel_type: fuelType })
+            });
+            if (response.ok) {
+                btn.classList.remove('fav-btn--active');
+                btn.setAttribute('aria-label', 'Add to favorites');
+            }
+        } else {
+            const response = await fetch('/api/favorites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    station,
+                    address,
+                    latitude: lat,
+                    longitude: lon,
+                    fuel_type: fuelType
+                })
+            });
+            if (response.ok) {
+                btn.classList.add('fav-btn--active');
+                btn.setAttribute('aria-label', 'Remove from favorites');
+            }
+        }
+    } catch (e) {
+        console.error('Favorite error:', e);
+    }
 }
 
 function updateSources(sources) {
