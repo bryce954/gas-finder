@@ -20,6 +20,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY --chown=app:app . .
 
+# Create cache directory with proper permissions for SQLite
+RUN mkdir -p /home/app/.cache/gas_finder && chown -R app:app /home/app/.cache
+
 # Switch to non-root user
 USER app
 

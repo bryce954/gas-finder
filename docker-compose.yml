@@ -1,0 +1,23 @@
+services:
+  gas-finder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gas-finder
+    restart: unless-stopped
+    ports:
+      - "5004:5002"
+    environment:
+      - PORT=5002
+    volumes:
+      - gas-finder-cache:/home/app/.cache/gas_finder
+    user: root
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/api/sources"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  gas-finder-cache:
