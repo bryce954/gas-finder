@@ -23,14 +23,13 @@ from gas_finder_history import get_price_history
 
 try:
     from py_gasbuddy import GasBuddy
-    from py_gasbuddy.consts import FUEL_FILTER_IDS
 
     GASBUDDY_AVAILABLE = True
 except ImportError:
     GASBUDDY_AVAILABLE = False
 
 try:
-    import pandas as pd
+    import pandas  # noqa: F401
 
     PANDAS_AVAILABLE = True
 except ImportError:
@@ -299,7 +298,10 @@ class GasFinder:
                             continue
 
                         addr = station.get("address", {})
-                        address_str = f"{addr.get('line1', '')}, {addr.get('locality', '')}, {addr.get('region', '')} {addr.get('postalCode', '')}"
+                        address_str = (
+                            f"{addr.get('line1', '')}, {addr.get('locality', '')}, "
+                            f"{addr.get('region', '')} {addr.get('postalCode', '')}"
+                        )
                         fuels_list = station.get("fuels", [])
 
                         for our_fuel, gb_key in fuel_key_map.items():
@@ -379,7 +381,8 @@ class GasFinder:
 
                 except TimeoutError:
                     print(
-                        f"GasBuddy API timeout ({GAS_BUDDY_API_TIMEOUT}s), attempt {attempt + 1}/{GAS_BUDDY_MAX_RETRIES}",
+                        f"GasBuddy API timeout ({GAS_BUDDY_API_TIMEOUT}s), "
+                        f"attempt {attempt + 1}/{GAS_BUDDY_MAX_RETRIES}",
                         file=sys.stderr,
                     )
                     if attempt < GAS_BUDDY_MAX_RETRIES - 1:
@@ -851,7 +854,10 @@ class GasFinder:
 def format_price(price: FuelPrice) -> str:
     dist = f" ({price.distance_km:.1f} km)" if price.distance_km else ""
     updated = f" - Updated: {price.updated[:10]}" if price.updated else ""
-    return f"  {price.station}{dist} [{price.source}]\n    {price.address}\n    {price.fuel_type}: {price.price:.3f} {price.currency}{updated}"
+    return (
+        f"  {price.station}{dist} [{price.source}]\n    {price.address}\n    "
+        f"{price.fuel_type}: {price.price:.3f} {price.currency}{updated}"
+    )
 
 
 async def main_async(args):

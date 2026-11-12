@@ -205,7 +205,7 @@ class PriceHistory:
         return sorted(results, key=lambda x: x["pct_change"])
 
     def add_favorite(self, station: str, address: str, latitude: float, longitude: float,
-                     fuel_type: str, alert_threshold: float | None = None) -> int:
+                     fuel_type: str, alert_threshold: float | None = None) -> int | None:
         """Add a station/fuel to favorites. Returns the favorite ID."""
         with sqlite3.connect(self.db_path) as conn:
             try:

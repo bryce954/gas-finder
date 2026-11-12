@@ -1,0 +1,44 @@
+[project]
+name = "gas-finder"
+version = "1.0.0"
+description = "Find cheapest gas, diesel, E85, and alternative fuels near you"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31.0",
+    "py-gasbuddy>=0.2.0",
+    "aiohttp>=3.9.0",
+    "pandas>=2.1.0",
+    "flask>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.17.0",
+    "mypy>=2.4.0",
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = [
+    # Broad exception handling in Flask API handlers is intentional
+    # (we want to return 500 errors, not crash the server)
+    "BLE001",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gas_finder", "gas_finder_cache", "gas_finder_history"]
+
+[tool.ruff.lint.pylint]
+allow-magic-value-types = []
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+disallow_untyped_defs = false
+disallow_any_generics = false
