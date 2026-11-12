@@ -501,7 +501,7 @@
         .result-card--selected {
             border-color: var(--amber);
             box-shadow:
-                0 0 0 2px var(--ink-surface),
+                0 0 0 2px var(--ink),
                 0 0 0 4px var(--amber),
                 0 4px 20px -4px rgba(212, 168, 67, 0.2);
         }
@@ -694,7 +694,7 @@
             font-weight: 700;
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
-            background: var(--ink-surface);
+            background: var(--ink);
             border: 1px solid var(--border);
             color: var(--text-dim);
         }
@@ -751,7 +751,7 @@
         }
 
         .leaflet-popup-content-wrapper {
-            background: var(--ink-surface);
+            background: var(--ink);
             border: 1px solid var(--border);
             border-radius: 10px;
             box-shadow: 0 8px 32px -8px rgba(0,0,0,0.5);
@@ -759,7 +759,7 @@
 
         .leaflet-popup-content { color: var(--text); margin: 0.5rem 0.875rem; }
 
-        .leaflet-popup-tip { background: var(--ink-surface); border: 1px solid var(--border); }
+        .leaflet-popup-tip { background: var(--ink); border: 1px solid var(--border); }
 
         .leaflet-control-zoom {
             border: 1px solid var(--border) !important;
@@ -777,7 +777,7 @@
             font-size: 1.25rem !important;
         }
 
-        .leaflet-control-zoom a:hover { background: var(--ink-surface) !important; }
+        .leaflet-control-zoom a:hover { background: var(--ink) !important; }
 
         .leaflet-control-attribution {
             background: rgba(10, 13, 15, 0.8) !important;
@@ -823,7 +823,7 @@
 
 /* ===== CHART PANEL ===== */
 .chart-panel {
-    background: var(--ink-surface);
+    background: var(--ink);
     border: 1px solid var(--border);
     border-radius: 12px;
     overflow: hidden;
@@ -885,7 +885,7 @@
 .chart-modal--visible { display: flex; }
 
 .chart-modal__content {
-    background: var(--ink-surface);
+    background: var(--ink);
     border: 1px solid var(--border);
     border-radius: 12px;
     width: min(700px, 90vw);
@@ -1513,6 +1513,23 @@ function handleDirectionsClick(event) {
 
 // ===== PRICE HISTORY CHART =====
 
+// Get CSS custom properties as JS values
+const cssVars = {
+    text: getComputedStyle(document.documentElement).getPropertyValue('--text').trim(),
+    'text-dim': getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim(),
+    ink: getComputedStyle(document.documentElement).getPropertyValue('--ink').trim(),
+    border: getComputedStyle(document.documentElement).getPropertyValue('--border').trim(),
+    amber: getComputedStyle(document.documentElement).getPropertyValue('--amber').trim(),
+    'fuel-regular': getComputedStyle(document.documentElement).getPropertyValue('--fuel-regular').trim(),
+    'fuel-midgrade': getComputedStyle(document.documentElement).getPropertyValue('--fuel-midgrade').trim(),
+    'fuel-premium': getComputedStyle(document.documentElement).getPropertyValue('--fuel-premium').trim(),
+    'fuel-diesel': getComputedStyle(document.documentElement).getPropertyValue('--fuel-diesel').trim(),
+    'fuel-e85': getComputedStyle(document.documentElement).getPropertyValue('--fuel-e85').trim(),
+    'fuel-e10': getComputedStyle(document.documentElement).getPropertyValue('--fuel-e10').trim(),
+    'fuel-e5': getComputedStyle(document.documentElement).getPropertyValue('--fuel-e5').trim(),
+    'fuel-lpg': getComputedStyle(document.documentElement).getPropertyValue('--fuel-lpg').trim()
+};
+
 let chartInstance = null;
 
 function openChartModal() {
@@ -1567,16 +1584,16 @@ async function renderChart(station, address, fuelType) {
 
         // Get fuel color
         const fuelColorMap = {
-            'REGULAR': 'var(--fuel-regular)',
-            'MIDGRADE': 'var(--fuel-midgrade)',
-            'PREMIUM': 'var(--fuel-premium)',
-            'DIESEL': 'var(--fuel-diesel)',
-            'E85': 'var(--fuel-e85)',
-            'E10': 'var(--fuel-e10)',
-            'E5': 'var(--fuel-e5)',
-            'LPG': 'var(--fuel-lpg)'
+            'REGULAR': cssVars['fuel-regular'],
+            'MIDGRADE': cssVars['fuel-midgrade'],
+            'PREMIUM': cssVars['fuel-premium'],
+            'DIESEL': cssVars['fuel-diesel'],
+            'E85': cssVars['fuel-e85'],
+            'E10': cssVars['fuel-e10'],
+            'E5': cssVars['fuel-e5'],
+            'LPG': cssVars['fuel-lpg']
         };
-        const lineColor = fuelColorMap[fuelType] || 'var(--amber)';
+        const lineColor = fuelColorMap[fuelType] || cssVars.amber;
 
         chartInstance = new Chart(ctx, {
             type: 'line',
@@ -1600,19 +1617,19 @@ async function renderChart(station, address, fuelType) {
                 plugins: {
                     legend: {
                         display: true,
-                        labels: { color: var(--text-dim), font: { family: 'DM Sans', size: 12 } }
+                        labels: { color: cssVars['text-dim'], font: { family: 'DM Sans', size: 12 } }
                     },
                     title: {
                         display: true,
                         text: station,
-                        color: var(--text),
+                        color: cssVars.text,
                         font: { family: 'DM Sans', size: 16, weight: '600' }
                     },
                     tooltip: {
-                        backgroundColor: var(--ink-surface),
-                        titleColor: var(--text),
-                        bodyColor: var(--text-dim),
-                        borderColor: var(--border),
+                        backgroundColor: cssVars.ink,
+                        titleColor: cssVars.text,
+                        bodyColor: cssVars['text-dim'],
+                        borderColor: cssVars.border,
                         borderWidth: 1,
                         callbacks: {
                             label: ctx => `${ctx.parsed.y.toFixed(3)} ${history[0]?.currency || 'USD'}`
@@ -1621,12 +1638,12 @@ async function renderChart(station, address, fuelType) {
                 },
                 scales: {
                     x: {
-                        ticks: { color: var(--text-dim), font: { family: 'Space Mono', size: 11 } },
-                        grid: { color: var(--border) }
+                        ticks: { color: cssVars['text-dim'], font: { family: 'Space Mono', size: 11 } },
+                        grid: { color: cssVars.border }
                     },
                     y: {
-                        ticks: { color: var(--text-dim), font: { family: 'Space Mono', size: 11 } },
-                        grid: { color: var(--border) },
+                        ticks: { color: cssVars['text-dim'], font: { family: 'Space Mono', size: 11 } },
+                        grid: { color: cssVars.border },
                         beginAtZero: false
                     }
                 }
