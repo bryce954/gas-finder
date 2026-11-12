@@ -351,6 +351,81 @@ def favorites_is_favorited():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/route", methods=["POST"])
+def route():
+    """Find fuel stations along a driving route between two points."""
+    data = request.get_json()
+    start_lat = data.get("start_lat")
+    start_lon = data.get("start_lon")
+    end_lat = data.get("end_lat")
+    end_lon = data.get("end_lon")
+    fuel_types = data.get("fuel_types", [])
+    sample_every_km = data.get("sample_every_km", 5)
+    search_radius_km = data.get("search_radius_km", 5)
+
+    if start_lat is None or start_lon is None or end_lat is None or end_lon is None:
+        return jsonify({"error": "start_lat, start_lon, end_lat, and end_lon required"}), 400
+
+    finder = get_finder()
+    loop = get_loop()
+
+    try:
+        prices = loop.run_until_complete(
+            finder.find_prices_along_route(
+                float(start_lat),
+                float(start_lon),
+                float(end_lat),
+                float(end_lon),
+                fuel_types if fuel_types else None,
+                sample_every_km=float(sample_every_km),
+                search_radius_km=float(search_radius_km),
+            )
+        )
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+    if not prices:
+        return jsonify(
+            {
+                "start": {"lat": float(start_lat), "lon": float(start_lon)},
+                "end": {"lat": float(end_lat), "lon": float(end_lon)},
+                "prices": [],
+                "count": 0,
+                "message": "No fuel stations found along this route.",
+            }
+        )
+
+    results = []
+    for p in prices:
+        results.append(
+            {
+                "station": p.station,
+                "address": p.address,
+                "lat": p.latitude,
+                "lon": p.longitude,
+                "fuel_type": p.fuel_type,
+                "price": p.price,
+                "currency": p.currency,
+                "updated": p.updated,
+                "distance_km": p.distance_km,
+                "source": p.source,
+            }
+        )
+
+    return jsonify(
+        {
+            "start": {"lat": float(start_lat), "lon": float(start_lon)},
+            "end": {"lat": float(end_lat), "lon": float(end_lon)},
+            "prices": results,
+            "count": len(results),
+            "fuel_types": fuel_types,
+        }
+    )
+
+
 @app.route("/static/<path:path>")
 def serve_static(path):
     return send_from_directory("static", path)

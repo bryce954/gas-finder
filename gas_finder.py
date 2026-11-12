@@ -786,6 +786,68 @@ class GasFinder:
         return unique_prices
 
 
+    async def find_prices_along_route(
+        self,
+        start_lat: float,
+        start_lon: float,
+        end_lat: float,
+        end_lon: float,
+        fuel_types: list[str] | None = None,
+        sample_every_km: float = 5,
+        search_radius_km: float = 5,
+    ) -> list[FuelPrice]:
+        """Search for fuel stations along a driving route between two points.
+
+        Samples points along a straight line (approximating the driving route)
+        and searches for stations near each sample point. Results are tagged
+        with distance along the route so users can see where to stop.
+        """
+        import math
+
+        all_prices: list[FuelPrice] = []
+
+        # Calculate total distance
+        total_dist = self._calc_distance(start_lat, start_lon, end_lat, end_lon)
+        if total_dist == 0:
+            return []
+
+        # Number of sample points along the route
+        num_samples = max(2, int(math.ceil(total_dist / sample_every_km)))
+        sample_distances = [
+            i * total_dist / (num_samples - 1) for i in range(num_samples)
+        ]
+
+        # Search near each sample point
+        seen_stations: set[str] = set()
+        for i, dist_along in enumerate(sample_distances):
+            frac = dist_along / total_dist
+            # Linear interpolation (great circle approximation)
+            sample_lat = start_lat + frac * (end_lat - start_lat)
+            sample_lon = start_lon + frac * (end_lon - start_lon)
+
+            prices = await self.find_prices(
+                sample_lat,
+                sample_lon,
+                radius_km=search_radius_km,
+                fuel_types=fuel_types,
+            )
+
+            for p in prices:
+                station_key = f"{round(p.latitude, 4)},{round(p.longitude, 4)}"
+                if station_key in seen_stations:
+                    continue
+                seen_stations.add(station_key)
+
+                # Distance from start along route (km)
+                p.distance_km = round(dist_along, 1)
+                # Add route context
+                p.address = f"{p.address} ({dist_along:.1f} km from start)"
+                all_prices.append(p)
+
+        all_prices.sort(key=lambda p: (p.price == 0, p.price))
+        return all_prices
+
+
 def format_price(price: FuelPrice) -> str:
     dist = f" ({price.distance_km:.1f} km)" if price.distance_km else ""
     updated = f" - Updated: {price.updated[:10]}" if price.updated else ""
