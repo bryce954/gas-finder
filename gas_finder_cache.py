@@ -8,7 +8,6 @@ import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-
 CACHE_DIR = Path.home() / ".cache" / "gas_finder"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 CACHE_FILE = CACHE_DIR / "gasbuddy_cache.json"
@@ -44,7 +43,7 @@ class GasBuddyCache:
                     data = json.load(f)
                 for key, prices in data.items():
                     self._cache[key] = [CachedPrice(**p) for p in prices]
-            except Exception as e:
+            except Exception:
                 self._cache = {}
 
     def _save(self):
@@ -52,7 +51,7 @@ class GasBuddyCache:
             data = {k: [asdict(p) for p in v] for k, v in self._cache.items()}
             with open(self.cache_file, "w") as f:
                 json.dump(data, f)
-        except Exception as e:
+        except Exception:
             pass
 
     def _make_key(
