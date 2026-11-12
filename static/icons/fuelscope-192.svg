@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0d0f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a2028;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="pumpGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4a843;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a8842e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="url(#bgGradient)" />
+  <!-- Rounded corner container -->
+  <rect x="128" y="128" width="768" height="768" rx="120" fill="none" stroke="#d4a843" stroke-width="8" />
+  <!-- Fuel pump base -->
+  <rect x="440" y="560" width="144" height="200" rx="24" fill="#12171c" stroke="#2a323c" stroke-width="4" />
+  <!-- Pump top -->
+  <rect x="400" y="480" width="224" height="80" rx="24" fill="url(#pumpGradient)" />
+  <!-- Pump nozzle -->
+  <rect x="480" y="440" width="64" height="40" rx="16" fill="#2a323c" />
+  <!-- Nozzle tip -->
+  <rect x="496" y="424" width="32" height="16" rx="8" fill="#d4a843" />
+  <!-- Fuel drop -->
+  <path d="M512 320 c-30 0 -55 20 -55 50 c0 25 20 45 45 65 c25 -20 45 -40 45 -65 c0 -30 -25 -50 -55 -50 z" fill="#d4a843" />
+  <!-- FuelScope text -->
+  <text x="512" y="720" font-family="monospace" font-size="48" font-weight="bold" fill="#e8eef5" text-anchor="middle">FuelScope</text>
+  <!-- Small pump icon below text -->
+  <path d="M480 780 h64 v40 h-64 z" fill="#d4a843" />
+  <path d="M500 760 l-20 -20 l40 -40 l40 40 l-20 20 z" fill="#d4a843" />
+</svg>

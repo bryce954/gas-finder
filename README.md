@@ -181,11 +181,13 @@ curl -X POST http://localhost:5002/api/search \
 - [x] GitHub Actions CI (lint, type-check, tests, Docker build)
 - [x] Miles as default unit
 
+### Done
+- [x] Mobile app (PWA: installable, offline cache, app icons)
+
 ### Future
 - [ ] Expand FuelWide coverage to more countries
 - [ ] Multi-point E85 search improvements
 - [ ] Docker Compose for easy deployment
-- [ ] Mobile app (React Native or Flutter)
 
 ## License
 
