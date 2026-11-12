@@ -1108,6 +1108,45 @@
                 </div>
             </section>
 
+            <!-- Route Planning Panel -->
+            <section class="panel">
+                <header class="panel__header">
+                    <h2 class="panel__title">Route Planning</h2>
+                </header>
+                <div class="panel__body">
+                    <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                        <label for="routeStart" style="font-family:var(--font-mono);font-size:var(--step--2);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);white-space:nowrap;">Start</label>
+                        <input type="text" id="routeStart" class="input-field" placeholder="Start address or coordinates" aria-label="Route start location">
+                        <label for="routeEnd" style="font-family:var(--font-mono);font-size:var(--step--2);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);white-space:nowrap;">End</label>
+                        <input type="text" id="routeEnd" class="input-field" placeholder="End address or coordinates" aria-label="Route end location">
+                        <div style="display:flex;align-items:center;gap:0.75rem;">
+                            <label for="routeFuelSelect" style="font-family:var(--font-mono);font-size:var(--step--2);text-transform:uppercase;letter-spacing:0.05em;color:var(--text-faint);white-space:nowrap;">Fuel</label>
+                            <select id="routeFuelSelect" class="select-field" multiple aria-label="Select fuel types for route">
+                                <option value="regular">Regular</option>
+                                <option value="midgrade">Midgrade</option>
+                                <option value="premium">Premium</option>
+                                <option value="diesel">Diesel</option>
+                                <option value="e85">E85</option>
+                                <option value="e10">E10</option>
+                                <option value="e5">E5</option>
+                                <option value="lpg">LPG</option>
+                            </select>
+                        </div>
+                        <button id="routeSearchBtn" class="btn btn--primary" style="width:100%;">Find Cheapest Along Route</button>
+                    </div>
+                    <div id="routeResults" style="margin-top:1rem;">
+                        <div class="empty-state" style="padding:1rem;">
+                            <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="M17 2l-1.5 17M17 2l3.35 14.111M5.719 16l1.758 2 4.333-2.653M7.5 21.5l-2.5-6.419M10.5 21.5l-2.5-6.419M17 2v18.285"></path>
+                            </svg>
+                            <p class="empty-state__text">Plan a route to see stations along the way</p>
+                            <p class="empty-state__hint">Enter start and end locations</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Data Sources Panel -->
             <section class="panel">
                 <header class="panel__header">
@@ -1752,6 +1791,256 @@ async function handleFavoriteClick(event) {
     }
 }
 
+// ===== ROUTE PLANNING =====
+
+let routeMarkers = [];
+let routeLine = null;
+let routeStartMarker = null;
+let routeEndMarker = null;
+
+function calcRouteDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function clearRouteMarkers() {
+    routeMarkers.forEach(m => map.removeLayer(m));
+    routeMarkers = [];
+    if (routeLine) {
+        map.removeLayer(routeLine);
+        routeLine = null;
+    }
+    if (routeStartMarker) {
+        map.removeLayer(routeStartMarker);
+        routeStartMarker = null;
+    }
+    if (routeEndMarker) {
+        map.removeLayer(routeEndMarker);
+        routeEndMarker = null;
+    }
+}
+
+function renderRouteResults(stations, startLat, startLon, endLat, endLon) {
+    const container = document.getElementById('routeResults');
+    if (!stations || stations.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="padding:1rem;">
+                <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+                <p class="empty-state__text">No fuel stations found along this route</p>
+                <p class="empty-state__hint">Try increasing search radius</p>
+            </div>
+        `;
+        return;
+    }
+
+    clearRouteMarkers();
+
+    // Add start/end markers
+    const startColor = 'var(--amber)';
+    const endColor = 'var(--crimson)';
+
+    routeStartMarker = L.marker([startLat, startLon], {
+        icon: L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="width:28px;height:28px;border-radius:50%;background:${startColor};border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;font-family:'Space Mono',monospace;">S</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+        }),
+    }).addTo(map);
+    routeStartMarker.bindPopup('<strong>Route Start</strong>');
+
+    routeEndMarker = L.marker([endLat, endLon], {
+        icon: L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="width:28px;height:28px;border-radius:50%;background:${endColor};border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;font-family:'Space Mono',monospace;">E</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+        }),
+    }).addTo(map);
+    routeEndMarker.bindPopup('<strong>Route End</strong>');
+
+    // Draw route line
+    routeLine = L.polyline([[startLat, startLon], [endLat, endLon]], {
+        color: 'var(--amber)',
+        weight: 3,
+        opacity: 0.6,
+        dashArray: '10, 10',
+    }).addTo(map);
+
+    // Calculate total route distance
+    const totalDist = calcRouteDistance(startLat, startLon, endLat, endLon);
+
+    // Add station markers along route
+    stations.forEach((station, index) => {
+        const color = FUEL_COLORS[station.fuel_type] || 'var(--amber)';
+        const label = station.fuel_type.charAt(0);
+
+        const marker = L.marker([station.lat, station.lon], {
+            icon: L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:700;font-family:'Space Mono',monospace;">${label}</div>`,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
+            }),
+        }).addTo(map);
+
+        const distFromStart = calcRouteDistance(startLat, startLon, station.lat, station.lon);
+        const distStr = useMiles ? `${(distFromStart * 0.621371).toFixed(1)} mi` : `${distFromStart.toFixed(1)} km`;
+
+        marker.bindPopup(`
+            <div style="min-width:200px;font-family:'DM Sans',sans-serif;">
+                <h4 style="margin:0 0 0.5rem 0;font-size:0.95rem;">${station.station}</h4>
+                <p style="margin:0 0 0.5rem 0;color:var(--text-dim);font-size:0.8rem;">${station.address}</p>
+                <div style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.5rem;">
+                    <span class="fuel-pill ${FUEL_PILL_CLASS[station.fuel_type] || ''}" style="font-size:0.65rem;padding:0.2rem 0.5rem;">
+                        ${station.fuel_type}: <span style="font-weight:700;">${station.price.toFixed(3)} ${station.currency}</span>
+                    </span>
+                </div>
+                <small style="color:var(--text-faint);">${distStr} from start • ${station.source}</small>
+                <br>
+                <a href="${getDirectionsUrl(station.lat, station.lon, station.station)}" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none;font-size:0.75rem;display:inline-flex;align-items:center;gap:0.375rem;margin-top:0.375rem;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:12px;height:12px;">
+                        <path d="M17 2l-1.5 17M17 2l3.35 14.111M5.719 16l1.758 2 4.333-2.653M7.5 21.5l-2.5-6.419M10.5 21.5l-2.5-6.419M17 2v18.285"></path>
+                    </svg>
+                    Directions
+                </a>
+            </div>
+        `);
+
+        marker.on('click', () => {
+            map.setView([station.lat, station.lon], 14);
+            marker.openPopup();
+        });
+
+        routeMarkers.push(marker);
+    });
+
+    // Fit map to show all markers
+    const allCoords = [[startLat, startLon], [endLat, endLon], ...stations.map(s => [s.lat, s.lon])];
+    const bounds = L.latLngBounds(allCoords);
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
+
+    // Render list
+    const totalDistStr = useMiles ? `${(totalDist * 0.621371).toFixed(1)} mi` : `${totalDist.toFixed(1)} km`;
+
+    let html = `<div style="margin-bottom:0.75rem;">
+        <span class="source-badge">${stations.length} stations</span>
+        <span style="margin-left:0.5rem;color:var(--text-dim);font-size:var(--step--2);">${totalDistStr} total route</span>
+    </div>`;
+
+    stations.forEach(station => {
+        const distFromStart = calcRouteDistance(startLat, startLon, station.lat, station.lon);
+        const distStr = useMiles ? `${(distFromStart * 0.621371).toFixed(1)} mi` : `${distFromStart.toFixed(1)} km`;
+        const hasPrice = station.price && station.price > 0;
+        const pillClass = FUEL_PILL_CLASS[station.fuel_type] || '';
+
+        html += `
+            <div class="result-card" style="margin-bottom:0.5rem;padding:0.75rem;">
+                <div class="result-card__header">
+                    <span class="result-card__name">${station.station}</span>
+                    <span class="result-card__distance">${distStr}</span>
+                </div>
+                <div class="result-card__address">${station.address}</div>
+                <div class="result-card__fuels">
+                    <span class="fuel-pill ${pillClass}">
+                        <span class="fuel-pill__type">${station.fuel_type}</span>
+                        ${hasPrice
+                            ? `<span class="fuel-pill__price">${station.price.toFixed(3)}</span><span class="fuel-pill__currency">${station.currency}</span>`
+                            : '<span class="fuel-pill__price" style="font-size:0.65rem;font-weight:600;">HAS PUMP</span>'}
+                    </span>
+                </div>
+                <div class="result-card__meta" style="flex-direction:column;align-items:flex-start;gap:0.25rem;">
+                    <span class="source-badge">${station.source}</span>
+                    <span class="result-card__updated">Updated: ${station.updated ? (typeof station.updated === 'number' ? new Date(station.updated).toISOString().split('T')[0] : station.updated.split('T')[0]) : '—'}</span>
+                </div>
+                <button class="directions-btn directions-btn--${mapProvider}" data-lat="${station.lat}" data-lon="${station.lon}" data-name="${station.station}" style="margin-top:0.5rem;width:100%;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;">
+                        <path d="M17 2l-1.5 17M17 2l3.35 14.111M5.719 16l1.758 2 4.333-2.653M7.5 21.5l-2.5-6.419M10.5 21.5l-2.5-6.419M17 2v18.285"></path>
+                    </svg>
+                    Directions
+                </button>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // Wire up directions buttons
+    container.querySelectorAll('.directions-btn').forEach(btn => {
+        btn.addEventListener('click', handleDirectionsClick);
+    });
+}
+
+async function handleRouteSearch() {
+    const start = document.getElementById('routeStart').value.trim();
+    const end = document.getElementById('routeEnd').value.trim();
+    if (!start || !end) {
+        alert('Please enter both start and end locations');
+        return;
+    }
+
+    const fuelSelect = document.getElementById('routeFuelSelect');
+    const fuelTypes = Array.from(fuelSelect.selectedOptions).map(o => o.value);
+
+    showLoading(true);
+
+    try {
+        // Geocode start
+        const startGeo = await new Promise((resolve, reject) => {
+            const finder = get_finder();
+            const geo = finder.geocode_address(start);
+            if (geo) resolve(geo);
+            else reject(new Error('Failed to geocode start location'));
+        });
+
+        // Geocode end
+        const endGeo = await new Promise((resolve, reject) => {
+            const finder = get_finder();
+            const geo = finder.geocode_address(end);
+            if (geo) resolve(geo);
+            else reject(new Error('Failed to geocode end location'));
+        });
+
+        // Search route
+        const response = await fetch('/api/route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                start_lat: startGeo.lat,
+                start_lon: startGeo.lon,
+                end_lat: endGeo.lat,
+                end_lon: endGeo.lon,
+                fuel_types: fuelTypes,
+                sample_every_km: 5,
+                search_radius_km: 5,
+            }),
+        });
+
+        const data = await response.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        renderRouteResults(data.prices, startGeo.lat, startGeo.lon, endGeo.lat, endGeo.lon);
+
+        document.getElementById('locationValue').textContent = `Route: ${start} → ${end}`;
+    } catch (e) {
+        console.error('Route search error:', e);
+        alert('Route search failed. Please try again.');
+    } finally {
+        showLoading(false);
+    }
+}
+
 function updateSources(sources) {
             const container = document.getElementById('sourcesList');
             if (!sources || sources.length === 0) {
@@ -1906,6 +2195,8 @@ function updateSources(sources) {
                 search();
             }
         });
+
+        document.getElementById('routeSearchBtn').addEventListener('click', handleRouteSearch);
 
         document.getElementById('chartClose').addEventListener('click', closeChartModal);
 
