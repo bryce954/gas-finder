@@ -163,11 +163,6 @@ curl -X POST http://localhost:5002/api/search \
 
 ## Roadmap
 
-### In Progress
-- [ ] Add price history charts (visualize 7/30-day trends per station)
-- [ ] Favorites / price drop alerts for saved stations
-- [ ] Route planning: find cheapest fuel along a driving route
-
 ### Done
 - [x] CLI tool with JSON/human-readable output
 - [x] Web app with Leaflet map + miles/km toggle
@@ -178,18 +173,10 @@ curl -X POST http://localhost:5002/api/search \
 - [x] Map directions to stations (Google Maps, Apple Maps, Waze)
 - [x] Favorites with price drop alerts
 - [x] Route planning: find cheapest fuel along a driving route
-- [x] GitHub Actions CI (lint, type-check, tests, Docker build)
-- [x] Miles as default unit
-
-### Done
-- [x] Mobile app (PWA: installable, offline cache, app icons)
-
-### Done
-- [x] Mobile app (PWA: installable, offline cache, app icons)
-
-### Done
 - [x] Mobile app (PWA: installable, offline cache, app icons)
 - [x] Docker Compose for easy deployment (`docker compose up`)
+- [x] GitHub Actions CI (lint, type-check, tests, Docker build)
+- [x] Miles as default unit
 
 ### Future
 - [ ] Expand FuelWide coverage to more countries

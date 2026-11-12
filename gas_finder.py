@@ -722,6 +722,43 @@ class GasFinder:
             return "australia"
         return "us"
 
+    def _bearing(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """Calculate the bearing from point 1 to point 2 in degrees (0-360)."""
+        import math
+
+        lat1_rad = math.radians(lat1)
+        lat2_rad = math.radians(lat2)
+        dlon_rad = math.radians(lon2 - lon1)
+
+        y = math.sin(dlon_rad) * math.cos(lat2_rad)
+        x = math.cos(lat1_rad) * math.sin(lat2_rad) - math.sin(lat1_rad) * math.cos(lat2_rad) * math.cos(dlon_rad)
+
+        bearing = math.degrees(math.atan2(y, x))
+        return (bearing + 360) % 360
+
+    def _destination_point(
+        self, lat: float, lon: float, bearing_deg: float, distance_km: float
+    ) -> tuple[float, float]:
+        """Calculate destination point given start point, bearing, and distance."""
+        import math
+
+        R = 6371  # Earth radius in km
+        lat1 = math.radians(lat)
+        lon1 = math.radians(lon)
+        bearing = math.radians(bearing_deg)
+        angular_distance = distance_km / R
+
+        lat2 = math.asin(
+            math.sin(lat1) * math.cos(angular_distance)
+            + math.cos(lat1) * math.sin(angular_distance) * math.cos(bearing)
+        )
+        lon2 = lon1 + math.atan2(
+            math.sin(bearing) * math.sin(angular_distance) * math.cos(lat1),
+            math.cos(angular_distance) - math.sin(lat1) * math.sin(lat2),
+        )
+
+        return math.degrees(lat2), math.degrees(lon2)
+
     async def find_prices(
         self,
         lat: float,
@@ -798,12 +835,23 @@ class GasFinder:
         fuel_types: list[str] | None = None,
         sample_every_km: float = 5,
         search_radius_km: float = 5,
+        offset_km: float | None = None,
     ) -> list[FuelPrice]:
         """Search for fuel stations along a driving route between two points.
 
         Samples points along a straight line (approximating the driving route)
-        and searches for stations near each sample point. Results are tagged
-        with distance along the route so users can see where to stop.
+        and searches for stations near each sample point. Also searches at
+        perpendicular offsets from the route line to catch stations that
+        aren't exactly on the route.
+
+        Args:
+            start_lat, start_lon: Starting point coordinates
+            end_lat, end_lon: Ending point coordinates
+            fuel_types: Fuel types to filter by
+            sample_every_km: Distance between sample points along the route (km)
+            search_radius_km: Search radius around each sample point (km)
+            offset_km: Perpendicular offset distance from route line (km).
+                       Defaults to search_radius_km * 0.5.
         """
         import math
 
@@ -820,32 +868,53 @@ class GasFinder:
             i * total_dist / (num_samples - 1) for i in range(num_samples)
         ]
 
-        # Search near each sample point
+        # Perpendicular offset distance (defaults to half the search radius)
+        if offset_km is None:
+            offset_km = search_radius_km * 0.5
+
+        # Calculate bearing from start to end for perpendicular offsets
+        bearing = self._bearing(start_lat, start_lon, end_lat, end_lon)
+        bearing_perp_right = (bearing + 90) % 360
+        bearing_perp_left = (bearing - 90) % 360
+
+        # Search near each sample point (center + left/right perpendicular offsets)
         seen_stations: set[str] = set()
-        for i, dist_along in enumerate(sample_distances):
+        for dist_along in sample_distances:
             frac = dist_along / total_dist
-            # Linear interpolation (great circle approximation)
+            # Linear interpolation along route
             sample_lat = start_lat + frac * (end_lat - start_lat)
             sample_lon = start_lon + frac * (end_lon - start_lon)
 
-            prices = await self.find_prices(
-                sample_lat,
-                sample_lon,
-                radius_km=search_radius_km,
-                fuel_types=fuel_types,
+            # Build list of search points: center + left/right offsets
+            search_points = [(sample_lat, sample_lon)]
+            offset_right = self._destination_point(
+                sample_lat, sample_lon, bearing_perp_right, offset_km
             )
+            offset_left = self._destination_point(
+                sample_lat, sample_lon, bearing_perp_left, offset_km
+            )
+            search_points.append(offset_right)
+            search_points.append(offset_left)
 
-            for p in prices:
-                station_key = f"{round(p.latitude, 4)},{round(p.longitude, 4)}"
-                if station_key in seen_stations:
-                    continue
-                seen_stations.add(station_key)
+            for p_lat, p_lon in search_points:
+                prices = await self.find_prices(
+                    p_lat,
+                    p_lon,
+                    radius_km=search_radius_km,
+                    fuel_types=fuel_types,
+                )
 
-                # Distance from start along route (km)
-                p.distance_km = round(dist_along, 1)
-                # Add route context
-                p.address = f"{p.address} ({dist_along:.1f} km from start)"
-                all_prices.append(p)
+                for p in prices:
+                    station_key = f"{round(p.latitude, 4)},{round(p.longitude, 4)}"
+                    if station_key in seen_stations:
+                        continue
+                    seen_stations.add(station_key)
+
+                    # Distance from start along route (km)
+                    p.distance_km = round(dist_along, 1)
+                    # Add route context
+                    p.address = f"{p.address} ({dist_along:.1f} km from start)"
+                    all_prices.append(p)
 
         all_prices.sort(key=lambda p: (p.price == 0, p.price))
         return all_prices

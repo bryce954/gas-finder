@@ -315,6 +315,111 @@ class TestRoutePlanning:
         assert len(prices) == 1
         assert prices[0].station == "Same Station"
 
+    def test_find_prices_along_route_with_offsets(self):
+        """Test route search with perpendicular offsets finds off-route stations."""
+        finder = GasFinder()
+
+        call_points = []
+
+        async def mock_find_prices(lat, lon, radius_km=None, fuel_types=None):
+            call_points.append((lat, lon))
+            return [
+                FuelPrice(
+                    station=f"Station at {lat:.4f},{lon:.4f}",
+                    address="123 Main St",
+                    latitude=lat,
+                    longitude=lon,
+                    fuel_type="REGULAR",
+                    price=3.50,
+                    currency="USD",
+                    updated="2024-01-01T00:00:00Z",
+                    source="GasBuddy",
+                )
+            ]
+
+        finder.find_prices = mock_find_prices
+
+        # Route from LA to San Diego with offsets enabled
+        prices = asyncio.run(
+            finder.find_prices_along_route(
+                34.0522, -118.2437,  # LA
+                32.7157, -117.1611,  # San Diego
+                fuel_types=["regular"],
+                sample_every_km=100,
+                search_radius_km=10,
+                offset_km=5,
+            )
+        )
+
+        # Should have called find_prices at center points AND offset points
+        # (each sample point generates 3 searches: center + left + right offset)
+        assert call_points, "Should have made search calls"
+        assert len(call_points) > 3, f"Expected multiple search points, got {len(call_points)}"
+
+        # Should have found stations at offset points too
+        assert len(prices) > 0
+
+    def test_find_prices_along_route_default_offset(self):
+        """Test route search uses default offset (half of search radius)."""
+        finder = GasFinder()
+
+        call_points = []
+
+        async def mock_find_prices(lat, lon, radius_km=None, fuel_types=None):
+            call_points.append((lat, lon))
+            return []
+
+        finder.find_prices = mock_find_prices
+
+        # Route with no offset_km specified - should default to search_radius_km * 0.5
+        asyncio.run(
+            finder.find_prices_along_route(
+                34.0522, -118.2437,
+                34.1, -118.2,
+                fuel_types=["regular"],
+                sample_every_km=10,
+                search_radius_km=10,
+            )
+        )
+
+        # Default offset should be 5 km (half of 10 km search radius)
+        # Should have called find_prices at more than just center points
+        assert len(call_points) > 2, "Expected searches at offset points too"
+
+    def test_bearing_calculation(self):
+        """Test bearing calculation between two points."""
+        finder = GasFinder()
+
+        # North: bearing should be 0 degrees
+        bearing = finder._bearing(0, 0, 1, 0)
+        assert abs(bearing - 0) < 1 or abs(bearing - 360) < 1
+
+        # East: bearing should be 90 degrees
+        bearing = finder._bearing(0, 0, 0, 1)
+        assert abs(bearing - 90) < 1
+
+        # South: bearing should be 180 degrees
+        bearing = finder._bearing(0, 0, -1, 0)
+        assert abs(bearing - 180) < 1
+
+        # West: bearing should be 270 degrees
+        bearing = finder._bearing(0, 0, 0, -1)
+        assert abs(bearing - 270) < 1
+
+    def test_destination_point(self):
+        """Test destination point calculation."""
+        finder = GasFinder()
+
+        # Go 100 km north from equator
+        lat, lon = finder._destination_point(0, 0, 0, 100)
+        assert abs(lat - 0.899) < 0.01  # ~100 km north
+        assert abs(lon - 0) < 0.01  # longitude shouldn't change much
+
+        # Go 100 km east from equator
+        lat, lon = finder._destination_point(0, 0, 90, 100)
+        assert abs(lat - 0) < 0.01  # latitude shouldn't change
+        assert abs(lon - 0.899) < 0.01  # ~100 km east
+
 
 class TestPriceHistoryFavorites:
     """Test PriceHistory favorites functionality."""
