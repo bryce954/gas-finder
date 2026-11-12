@@ -184,9 +184,13 @@ curl -X POST http://localhost:5002/api/search \
 ### Done
 - [x] Mobile app (PWA: installable, offline cache, app icons)
 
+### Done
+- [x] Mobile app (PWA: installable, offline cache, app icons)
+
 ### Future
 - [ ] Expand FuelWide coverage to more countries
 - [ ] Multi-point E85 search improvements
+- [ ] Docker Compose for easy deployment (files created, needs testing)
 - [ ] Docker Compose for easy deployment
 
 ## License
