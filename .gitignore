@@ -30,7 +30,8 @@ logs/
 
 # Cache
 .cache/
-*.cache
+*.cache/
+.mypy_cache/
 
 # Environment
 .env
