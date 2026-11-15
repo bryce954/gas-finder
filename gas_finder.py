@@ -7,6 +7,7 @@ Uses: py-gasbuddy (US/Canada) + FuelWide (Europe/International)
 import argparse
 import asyncio
 import json
+import math
 import os
 import socket
 import sys
@@ -218,8 +219,20 @@ class GasFinder:
             "e10": "regular_gas",
         }
 
-        search_points = [(lat, lon)]
-        seen_stations = set()
+        # GasBuddy API only returns stations within ~2-3 miles of search center.
+        # To cover a larger radius, search from multiple points radiating outward.
+        search_points: list[tuple[float, float]] = [(lat, lon)]
+        if radius_km > 5:
+            # Add points at 5km intervals along a circle at radius_km distance
+            # This covers the full search area since GasBuddy limits per-search results
+            num_points = min(8, max(2, int(math.ceil(radius_km / 15))))
+            for i in range(num_points):
+                angle = 2 * math.pi * i / num_points
+                offset_lat = lat + (radius_km / 111) * math.cos(angle)  # ~111 km per degree lat
+                offset_lon = lon + (radius_km / (111 * math.cos(math.radians(lat)))) * math.sin(angle)
+                search_points.append((offset_lat, offset_lon))
+
+        seen_stations: set[str] = set()
 
         for i, (search_lat, search_lon) in enumerate(search_points):
             if i > 0:
