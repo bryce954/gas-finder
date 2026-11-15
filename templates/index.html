@@ -1270,6 +1270,14 @@ let lastLat = null;
 
             // Add attribution in bottom-left
             L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(map);
+
+            // Map click to search from that location
+            map.on('click', (e) => {
+                const { lat, lon } = e.latlng;
+                document.getElementById('locationInput').value = `(${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+                searchFromMap(lat, lon);
+            });
+
         }
 
         // ===== MARKER CREATION =====
@@ -1750,12 +1758,59 @@ async function renderChart(station, address, fuelType) {
     openChartModal();
 }
 
-function handleChartClick(event) {
-    const btn = event.currentTarget;
-    const station = btn.getAttribute('data-station');
-    const address = btn.getAttribute('data-address');
-    const fuelType = btn.getAttribute('data-fuel');
-    renderChart(station, address, fuelType);
+// ===== MAP CLICK SEARCH =====
+
+async function searchFromMap(lat, lon) {
+    document.getElementById('locationValue').textContent = `Searching near ${lat.toFixed(4)}, ${lon.toFixed(4)}...`;
+    document.getElementById('locationInput').value = `(${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+
+    showLoading(true);
+
+    try {
+        const response = await fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                lat: lat,
+                lon: lon,
+                radius: 16,
+                fuel_types: []
+            })
+        });
+
+        const data = await response.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        if (data.prices && data.prices.length > 0) {
+            document.getElementById('locationValue').textContent = `${data.prices.length} stations found near ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+            map.setView([lat, lon], 12);
+            addStationMarkers(data.prices);
+            renderResults(data.prices);
+            updateStats(data.prices);
+            updateSources(data.sources);
+        } else {
+            document.getElementById('locationValue').textContent = `No stations found near ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+            map.setView([lat, lon], 12);
+            document.getElementById('resultsList').innerHTML = `
+                <div class="empty-state" style="padding:clamp(2rem,4vw,3rem) 1.5rem;">
+                    <svg class="empty-state__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="M21 21l-4.35-4.35"></path>
+                    </svg>
+                    <p class="empty-state__text">No prices found at this location</p>
+                    <p class="empty-state__hint">Try clicking a different area on the map</p>
+                </div>
+            `;
+        }
+    } catch (e) {
+        console.error('Map click search error:', e);
+        alert('Search failed. Please try again.');
+    } finally {
+        showLoading(false);
+    }
 }
 
 async function handleFavoriteClick(event) {
